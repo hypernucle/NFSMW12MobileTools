@@ -1,5 +1,7 @@
 package util;
 
+import java.util.List;
+
 import com.google.gson.annotations.SerializedName;
 
 public final class DataClasses {
@@ -12,6 +14,7 @@ public final class DataClasses {
 		private byte[] fnv1Hash;
 		private int blockEmptyBytesCount = 0;
 		private byte[] blockBytes = new byte[0];
+		private List<byte[]> blockElements;
 		
 		public byte[] getHeader() {
 			return header;
@@ -54,6 +57,13 @@ public final class DataClasses {
 		public void setBlockBytes(byte[] blockBytes) {
 			this.blockBytes = blockBytes;
 		}
+		
+		public List<byte[]> getBlockElements() {
+			return blockElements;
+		}
+		public void setBlockElements(List<byte[]> blockElements) {
+			this.blockElements = blockElements;
+		}
 	}
 	
 	public static class SBinJson {
@@ -89,6 +99,8 @@ public final class DataClasses {
 		private String cdatHexStr;
 		@SerializedName("CDAT_HexEmptyBytesCount")
 		private int cdatHexEmptyBytesCount;
+		@SerializedName("CDAT_Strings")
+		private List<String> cdatStrings;
 		
 		public String getFileName() {
 			return fileName;
@@ -200,6 +212,13 @@ public final class DataClasses {
 		}
 		public void setCDATHexEmptyBytesCount(int cdatHexEmptyBytesCount) {
 			this.cdatHexEmptyBytesCount = cdatHexEmptyBytesCount;
-		} 
+		}
+		
+		public List<String> getCDATStrings() {
+			return cdatStrings;
+		}
+		public void setCDATStrings(List<String> cdatStrings) {
+			this.cdatStrings = cdatStrings;
+		}
 	}
 }
