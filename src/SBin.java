@@ -19,6 +19,8 @@ import com.google.gson.reflect.TypeToken;
 import util.FNV1;
 import util.DataClasses.SBinBlockObj;
 import util.DataClasses.SBinJson;
+import util.DataClasses.SBinStringDataEntry;
+import util.DataClasses.SBinStringDataText;
 
 public class SBin {
 	
@@ -34,11 +36,14 @@ public class SBin {
 	private static final byte[] CHDR_HEADER = "CHDR".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] CDAT_HEADER = "CDAT".getBytes(StandardCharsets.UTF_8);
 	
+	private enum SBinType {
+		COMMON, STRINGDATA, TEXTURE
+	}
 	private static int curPos = 0x0;
 	
 	//
 
-	public void unpackSBin(String filePath) throws IOException {
+	public void unpackSBin(String fileType, String filePath) throws IOException {
 		SBinJson sbinJson = new SBinJson();
 		Path sbinFilePath = Paths.get(filePath);
 		byte[] sbinData = Files.readAllBytes(sbinFilePath);
@@ -48,6 +53,7 @@ public class SBin {
 			System.out.println("!!! This SBin version is not supported, version 3 required.");
 			return;
 		}
+		SBinType type = SBinType.valueOf(fileType.toUpperCase());
 		changeCurPos(0x8); // Skip SBin header + version
 
 		// ENUM (Not enough info)
@@ -80,12 +86,17 @@ public class SBin {
 		sbinJson.setCDATHexEmptyBytesCount(cdatBlock.getBlockEmptyBytesCount());
 		sbinJson.setCDATStrings(prepareCDATStrings(chdrBlock.getBlockBytes(), cdatBlock.getBlockBytes()));
 		
+		if (type.equals(SBinType.STRINGDATA)) {
+			unpackStringData(sbinJson, dataBlock);
+		}
+		
 		sbinJson.setFileName(sbinFilePath.getFileName().toString());
 		sbinJson.setSbinVersion(sbinVersion);
+		sbinJson.setSBinType(type.toString());
 
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		String jsonOut = gson.toJson(sbinJson);
-		Files.write(Paths.get("test.json"), jsonOut.getBytes(StandardCharsets.UTF_8));
+		Files.write(Paths.get(sbinJson.getFileName() + ".json"), jsonOut.getBytes(StandardCharsets.UTF_8));
 	}
 
 	public void repackSBin(String filePath) throws IOException {
@@ -261,6 +272,50 @@ public class SBin {
 		}
 		return block;
 	}
+	
+	private void unpackStringData(SBinJson sbinJson, SBinBlockObj dataBlock) {
+		List<SBinStringDataText> strDataTextArray = new ArrayList<>();
+		List<SBinStringDataEntry> strDataEntriesArray = new ArrayList<>();
+		
+		setCurPos(0x24); // Skip common bytes on DATA
+		int stringDataEntriesCount = byteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x4));
+		changeCurPos(0x4);
+		byte[] stringDataBytes = getBytesFromCurPos(dataBlock.getBlockBytes(), stringDataEntriesCount * 8);
+		
+		// Save first unknown DATA bytes
+		dataBlock.setBlockBytes(Arrays.copyOfRange(dataBlock.getBlockBytes(), 0, 0x24));
+		sbinJson.setDATAHexStr(hexToString(dataBlock.getBlockBytes()).toUpperCase());
+		
+		int prevTextChdrId = 0; // Prevent Text duplicates
+		List<byte[]> splitStringDataBytes = splitByteArray(stringDataBytes, 0x8);
+		int firstStringChdrId = twoBEByteArrayToInt(Arrays.copyOfRange(splitStringDataBytes.get(0), 0, 2));
+		//
+		for (byte[] strDataByteEntry : splitStringDataBytes) {
+			int stringChdrId = twoBEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 0, 2));
+			int textChdrId = twoBEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 2, 4));
+			String unkHexValue = hexToString(Arrays.copyOfRange(strDataByteEntry, 4, 8)).toUpperCase();
+			
+			// Create Text entry
+			if (prevTextChdrId < textChdrId) {
+				SBinStringDataText textEntry = new SBinStringDataText();
+				textEntry.setTextId(textChdrId);
+				textEntry.setText(sbinJson.getCDATStrings().get(textChdrId));
+				strDataTextArray.add(textEntry);
+				prevTextChdrId = textChdrId;
+			}
+			// Create String entry
+			SBinStringDataEntry stringEntry = new SBinStringDataEntry();
+			stringEntry.setStringId((sbinJson.getCDATStrings().get(stringChdrId)));
+			stringEntry.setTextId(textChdrId);
+			stringEntry.setUnkValue(unkHexValue);
+			strDataEntriesArray.add(stringEntry);
+		}
+		sbinJson.setStrDataTextArray(strDataTextArray);
+		sbinJson.setStrDataEntriesArray(strDataEntriesArray);
+		
+		// Keep only structure-related strings in CDAT output
+		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, firstStringChdrId));
+	}
 
 	//
 
@@ -268,12 +323,29 @@ public class SBin {
 		curPos = curPos + addition;
 //		System.out.println("### curPos: " + Integer.toHexString(curPos));
 	}
+	
+	private static void setCurPos(int newPos) {
+		curPos = newPos;
+//		System.out.println("### curPos: " + Integer.toHexString(curPos));
+	}
 
 	// Taken from StackOverflow (Dhaval Rami)
-	public static int byteArrayToInt(byte[] b) {
-		final ByteBuffer bb = ByteBuffer.wrap(b);
-		bb.order(ByteOrder.LITTLE_ENDIAN);
-		return bb.getInt();
+//	public static int byteArrayToInt(byte[] b) {
+//		final ByteBuffer bb = ByteBuffer.wrap(b);
+//		bb.order(ByteOrder.LITTLE_ENDIAN);
+//		return bb.getInt();
+//	}
+	
+	public static int byteArrayToInt(byte[] bytes) {
+		int beInt = ((bytes[0] & 0xFF) << 24) | 
+				((bytes[1] & 0xFF) << 16) | 
+				((bytes[2] & 0xFF) << 8) | 
+				((bytes[3] & 0xFF) << 0);
+		return hexRev(beInt);
+	}
+	
+	public static int twoBEByteArrayToInt(byte[] bytes) {
+		return ((bytes[1] & 0xFF) << 8) | (bytes[0] & 0xFF);
 	}
 
 	private byte[] getBytesFromCurPos(byte[] data, int to) {

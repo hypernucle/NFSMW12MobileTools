@@ -71,6 +71,8 @@ public final class DataClasses {
 		private String fileName; 
 		@SerializedName("SBinVersion")
 		private int sbinVersion; 
+		@SerializedName("SBinType")
+		private String sbinType; 
 		@SerializedName("ENUM_HexStr")
 		private String enumHexStr; 
 		@SerializedName("ENUM_HexEmptyBytesCount")
@@ -101,6 +103,11 @@ public final class DataClasses {
 		private int cdatHexEmptyBytesCount;
 		@SerializedName("CDAT_Strings")
 		private List<String> cdatStrings;
+		//
+		@SerializedName("StringData_Text")
+		private List<SBinStringDataText> strDataTextArray;
+		@SerializedName("StringData_Entries")
+		private List<SBinStringDataEntry> strDataEntriesArray;
 		
 		public String getFileName() {
 			return fileName;
@@ -114,6 +121,13 @@ public final class DataClasses {
 		}
 		public void setSbinVersion(int sbinVersion) {
 			this.sbinVersion = sbinVersion;
+		}
+		
+		public String getSBinType() {
+			return sbinType;
+		}
+		public void setSBinType(String sbinType) {
+			this.sbinType = sbinType;
 		}
 		
 		public String getENUMHexStr() {
@@ -219,6 +233,80 @@ public final class DataClasses {
 		}
 		public void setCDATStrings(List<String> cdatStrings) {
 			this.cdatStrings = cdatStrings;
+		}
+		
+		public List<SBinStringDataText> getStrDataTextArray() {
+			return strDataTextArray;
+		}
+		public void setStrDataTextArray(List<SBinStringDataText> strDataTextArray) {
+			this.strDataTextArray = strDataTextArray;
+		}
+		
+		public List<SBinStringDataEntry> getStrDataEntriesArray() {
+			return strDataEntriesArray;
+		}
+		public void setStrDataEntriesArray(List<SBinStringDataEntry> strDataEntriesArray) {
+			this.strDataEntriesArray = strDataEntriesArray;
+		}
+	}
+	
+	public static class SBinStringDataText {
+		@SerializedName("TextId")
+		private int textId; 
+		@SerializedName("Text")
+		private String text;
+		
+		public int getTextId() {
+			return textId;
+		}
+		public void setTextId(int textId) {
+			this.textId = textId;
+		}
+		
+		public String getText() {
+			return text;
+		}
+		public void setText(String text) {
+			this.text = text;
+		} 
+	}
+	
+	public static class SBinStringDataEntry {
+		@SerializedName("StringId")
+		private String stringId; 
+		@SerializedName("TextId")
+		private int textId;
+		@SerializedName("UnkValue")
+		private String unkValue; 
+		//
+		private SBinStringDataText textObj;
+		
+		public String getStringId() {
+			return stringId;
+		}
+		public void setStringId(String stringId) {
+			this.stringId = stringId;
+		}
+		
+		public int getTextId() {
+			return textId;
+		}
+		public void setTextId(int textId) {
+			this.textId = textId;
+		}
+		
+		public String getUnkValue() {
+			return unkValue;
+		}
+		public void setUnkValue(String unkValue) {
+			this.unkValue = unkValue;
+		}
+		
+		public SBinStringDataText getTextObj() {
+			return textObj;
+		}
+		public void setTextObj(SBinStringDataText textObj) {
+			this.textObj = textObj;
 		}
 	}
 }
