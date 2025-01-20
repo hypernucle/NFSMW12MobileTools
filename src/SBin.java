@@ -17,10 +17,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 import util.FNV1;
-import util.DataClasses.SBinBlockObj;
-import util.DataClasses.SBinJson;
-import util.DataClasses.SBinStringDataEntry;
-import util.DataClasses.SBinStringDataText;
+import util.SBinType;
+import util.DataClasses.*;
 
 public class SBin {
 	
@@ -36,9 +34,6 @@ public class SBin {
 	private static final byte[] CHDR_HEADER = "CHDR".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] CDAT_HEADER = "CDAT".getBytes(StandardCharsets.UTF_8);
 	
-	private enum SBinType {
-		COMMON, STRINGDATA, TEXTURE
-	}
 	private static int curPos = 0x0;
 	
 	//
@@ -72,7 +67,7 @@ public class SBin {
 		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, OHDR_HEADER, DATA_HEADER);		
 		sbinJson.setOHDRHexStr(hexToString(ohdrBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setOHDRHexEmptyBytesCount(ohdrBlock.getBlockEmptyBytesCount());
-		// DATA (Not enough info)
+		// DATA (Partial info)
 		SBinBlockObj dataBlock = processSBinBlock(sbinData, DATA_HEADER, CHDR_HEADER);	
 		sbinJson.setDATAHexStr(hexToString(dataBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setDATAHexEmptyBytesCount(dataBlock.getBlockEmptyBytesCount());
@@ -103,6 +98,7 @@ public class SBin {
 		Reader reader = Files.newBufferedReader(Paths.get(filePath), StandardCharsets.UTF_8);
 		SBinJson sbinJsonObj = new Gson().fromJson(reader, new TypeToken<SBinJson>(){}.getType());
 		reader.close();
+		sbinJsonObj.setSBinTypeEnum(SBinType.valueOf(sbinJsonObj.getSBinType()));
 
 		// ENUM (Not enough info)
 		SBinBlockObj enumBlock = createSBinBlock(sbinJsonObj.getENUMHexStr(), ENUM_HEADER);
@@ -120,12 +116,12 @@ public class SBin {
 		SBinBlockObj ohdrBlock = createSBinBlock(sbinJsonObj.getOHDRHexStr(), OHDR_HEADER);
 		ohdrBlock.setBlockEmptyBytesCount(sbinJsonObj.getOHDRHexEmptyBytesCount());
 		byte[] finalOHDR = buildSBinBlock(ohdrBlock);
-		// DATA (Not enough info)
-		SBinBlockObj dataBlock = createSBinBlock(sbinJsonObj.getDATAHexStr(), DATA_HEADER);
+		// DATA (Partial info)
+		SBinBlockObj dataBlock = createDATABlock(sbinJsonObj, DATA_HEADER);
 		dataBlock.setBlockEmptyBytesCount(sbinJsonObj.getDATAHexEmptyBytesCount());
 		byte[] finalDATA = buildSBinBlock(dataBlock);
 		// CHDR & CDAT
-		SBinBlockObj cdatBlock = createCDATBlock(sbinJsonObj.getCDATStrings(), CDAT_HEADER);
+		SBinBlockObj cdatBlock = createCDATBlock(sbinJsonObj, CDAT_HEADER);
 		cdatBlock.setBlockEmptyBytesCount(sbinJsonObj.getCDATHexEmptyBytesCount());
 		byte[] finalCDAT = buildSBinBlock(cdatBlock);
 		//
@@ -167,6 +163,8 @@ public class SBin {
 	}
 
 	//
+	// SBin block methods
+	//
 
 	private SBinBlockObj processSBinBlock(byte[] sbinData, byte[] header, byte[] nextHeader) {
 		SBinBlockObj block = new SBinBlockObj();
@@ -194,9 +192,9 @@ public class SBin {
 		SBinBlockObj block = new SBinBlockObj();
 		block.setHeader(header);
 		block.setBlockBytes(decodeHexStr(hexStr));
-		block.setFnv1Hash(intToByteArrayBE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
+		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
 		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayBE(block.getBlockBytes().length, 0x4));
+			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
 		}
 		return block;
 	}
@@ -226,17 +224,26 @@ public class SBin {
 		return cdatStrings;
 	}
 	
-	private SBinBlockObj createCDATBlock(List<String> cdatStrings, byte[] header) throws IOException {
+	private SBinBlockObj createCDATBlock(SBinJson sbinJson, byte[] header) throws IOException {
 		SBinBlockObj block = new SBinBlockObj();
 		block.setHeader(header);
 		
 		ByteArrayOutputStream stringsHexStream = new ByteArrayOutputStream();
 		List<byte[]> blockElements = new ArrayList<>();
-		for (String entry : cdatStrings) {
+		for (String entry : sbinJson.getCDATStrings()) {
 			// Some elements could be empty, like the first one. Then data bytes begins with 00 splitter byte
 			byte[] byteEntry = entry.getBytes(StandardCharsets.UTF_8);
 			blockElements.add(byteEntry);
 		}
+		
+		if (sbinJson.getSBinTypeEnum().equals(SBinType.STRINGDATA)) {
+			for (SBinStringDataEntry strDataEntry : sbinJson.getStrDataEntriesArray()) {
+				String insert = strDataEntry.isTextEntry() ? strDataEntry.getTextValue() : strDataEntry.getStringId();
+				byte[] byteEntry = insert.getBytes(StandardCharsets.UTF_8);
+				blockElements.add(byteEntry);
+			}
+		}
+		
 		block.setBlockElements(blockElements); // Save it for CHDR block
 		for (byte[] element : blockElements) {
 			stringsHexStream.write(element);
@@ -244,9 +251,9 @@ public class SBin {
 		}
 		block.setBlockBytes(stringsHexStream.toByteArray());
 		
-		block.setFnv1Hash(intToByteArrayBE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
+		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
 		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayBE(block.getBlockBytes().length, 0x4));
+			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
 		}
 		return block;
 	}
@@ -261,20 +268,52 @@ public class SBin {
 			int chdrToCdatPos = pos;
 			int chdrToCdatSize = cdatEntry.length;
 			pos = pos + chdrToCdatSize + 0x1; // Zero byte-splitter
-			chdrHexStream.write(intToByteArrayBE(chdrToCdatPos, 0x4));
-			chdrHexStream.write(intToByteArrayBE(chdrToCdatSize, 0x4));
+			chdrHexStream.write(intToByteArrayLE(chdrToCdatPos, 0x4));
+			chdrHexStream.write(intToByteArrayLE(chdrToCdatSize, 0x4));
 		}
 		block.setBlockBytes(chdrHexStream.toByteArray());
 		
-		block.setFnv1Hash(intToByteArrayBE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
+		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
 		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayBE(block.getBlockBytes().length, 0x4));
+			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
 		}
 		return block;
 	}
 	
+	private SBinBlockObj createDATABlock(SBinJson sbinJson, byte[] header) throws IOException {
+		SBinBlockObj block = new SBinBlockObj();
+		block.setHeader(header);
+		
+		ByteArrayOutputStream dataHexStream = new ByteArrayOutputStream();
+		dataHexStream.write(decodeHexStr(sbinJson.getDATAHexStr()));
+		if (sbinJson.getSBinTypeEnum().equals(SBinType.STRINGDATA)) {
+			prepareStringDataForSBinBlock(dataHexStream, sbinJson.getStrDataEntriesArray());
+		}
+		block.setBlockBytes(dataHexStream.toByteArray());
+		
+		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
+		if (block.getBlockBytes().length != 0) {
+			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
+		}
+		return block;
+	}
+	
+	private void prepareStringDataForSBinBlock(ByteArrayOutputStream dataHexStream, List<SBinStringDataEntry> entries) throws IOException {
+		ByteArrayOutputStream strDataHexStream = new ByteArrayOutputStream();
+		int dataStrCount = 0;
+		
+		for (SBinStringDataEntry entry : entries) {
+			if (entry.isTextEntry()) {continue;}
+			dataStrCount++;
+			strDataHexStream.write(shortToBytes((short)entry.getCHDRId().intValue()));
+			strDataHexStream.write(shortToBytes((short)entry.getCHDRIdTextRef().intValue()));
+			strDataHexStream.write(decodeHexStr(entry.getHalVersionValue()));
+		}
+		dataHexStream.write(intToByteArrayLE(dataStrCount, 0x4)); // StringData entries count, without Text entries
+		dataHexStream.write(strDataHexStream.toByteArray());
+	}
+	
 	private void unpackStringData(SBinJson sbinJson, SBinBlockObj dataBlock) {
-		List<SBinStringDataText> strDataTextArray = new ArrayList<>();
 		List<SBinStringDataEntry> strDataEntriesArray = new ArrayList<>();
 		
 		setCurPos(0x24); // Skip common bytes on DATA
@@ -288,35 +327,41 @@ public class SBin {
 		
 		int prevTextChdrId = 0; // Prevent Text duplicates
 		List<byte[]> splitStringDataBytes = splitByteArray(stringDataBytes, 0x8);
-		int firstStringChdrId = twoBEByteArrayToInt(Arrays.copyOfRange(splitStringDataBytes.get(0), 0, 2));
+		int firstStringChdrId = twoLEByteArrayToInt(Arrays.copyOfRange(splitStringDataBytes.get(0), 0, 2));
 		//
 		for (byte[] strDataByteEntry : splitStringDataBytes) {
-			int stringChdrId = twoBEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 0, 2));
-			int textChdrId = twoBEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 2, 4));
+			int stringChdrId = twoLEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 0, 2));
+			int textChdrId = twoLEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 2, 4));
 			String unkHexValue = hexToString(Arrays.copyOfRange(strDataByteEntry, 4, 8)).toUpperCase();
+			
+			// Create StringData entry. One Text entry can be referenced by more than 1 String entry
+			SBinStringDataEntry stringEntry = new SBinStringDataEntry();
+			stringEntry.setTextEntry(false);
+			stringEntry.setCHDRId(Long.valueOf(stringChdrId));
+			stringEntry.setStringId((sbinJson.getCDATStrings().get(stringChdrId)));
+			stringEntry.setCHDRIdTextRef(Long.valueOf(textChdrId));
+			stringEntry.setHalVersionValue(unkHexValue);
+			strDataEntriesArray.add(stringEntry);
 			
 			// Create Text entry
 			if (prevTextChdrId < textChdrId) {
-				SBinStringDataText textEntry = new SBinStringDataText();
-				textEntry.setTextId(textChdrId);
-				textEntry.setText(sbinJson.getCDATStrings().get(textChdrId));
-				strDataTextArray.add(textEntry);
+				SBinStringDataEntry textEntry = new SBinStringDataEntry();
+				textEntry.setTextEntry(true);
+				textEntry.setCHDRId(Long.valueOf(textChdrId));
+				textEntry.setCHDRIdTextRef(null); // Use Long here to hide empty TextIdRef for Json output
+				textEntry.setTextValue(sbinJson.getCDATStrings().get(textChdrId));
+				strDataEntriesArray.add(textEntry);
 				prevTextChdrId = textChdrId;
 			}
-			// Create String entry
-			SBinStringDataEntry stringEntry = new SBinStringDataEntry();
-			stringEntry.setStringId((sbinJson.getCDATStrings().get(stringChdrId)));
-			stringEntry.setTextId(textChdrId);
-			stringEntry.setUnkValue(unkHexValue);
-			strDataEntriesArray.add(stringEntry);
 		}
-		sbinJson.setStrDataTextArray(strDataTextArray);
 		sbinJson.setStrDataEntriesArray(strDataEntriesArray);
 		
 		// Keep only structure-related strings in CDAT output
 		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, firstStringChdrId));
 	}
 
+	//
+	// Util methods
 	//
 
 	private static void changeCurPos(int addition) {
@@ -328,13 +373,6 @@ public class SBin {
 		curPos = newPos;
 //		System.out.println("### curPos: " + Integer.toHexString(curPos));
 	}
-
-	// Taken from StackOverflow (Dhaval Rami)
-//	public static int byteArrayToInt(byte[] b) {
-//		final ByteBuffer bb = ByteBuffer.wrap(b);
-//		bb.order(ByteOrder.LITTLE_ENDIAN);
-//		return bb.getInt();
-//	}
 	
 	public static int byteArrayToInt(byte[] bytes) {
 		int beInt = ((bytes[0] & 0xFF) << 24) | 
@@ -344,7 +382,7 @@ public class SBin {
 		return hexRev(beInt);
 	}
 	
-	public static int twoBEByteArrayToInt(byte[] bytes) {
+	public static int twoLEByteArrayToInt(byte[] bytes) {
 		return ((bytes[1] & 0xFF) << 8) | (bytes[0] & 0xFF);
 	}
 
@@ -352,9 +390,13 @@ public class SBin {
 		return Arrays.copyOfRange(data, curPos, curPos + to);
 	}
 
-	private byte[] intToByteArrayBE(int data, int size) {    
+	private byte[] intToByteArrayLE(int data, int size) {    
 		return ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN).putInt(data).array(); 
 	}
+	
+	private byte[] shortToBytes(int data) {
+        return ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN).putShort((short)data).array();
+    }
 
 	// Taken from StackOverflow (maybeWeCouldStealAVan)
 	private String hexToString(byte[] bytes) {

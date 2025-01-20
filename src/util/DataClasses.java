@@ -104,10 +104,9 @@ public final class DataClasses {
 		@SerializedName("CDAT_Strings")
 		private List<String> cdatStrings;
 		//
-		@SerializedName("StringData_Text")
-		private List<SBinStringDataText> strDataTextArray;
-		@SerializedName("StringData_Entries")
+		@SerializedName("StringData")
 		private List<SBinStringDataEntry> strDataEntriesArray;
+		private SBinType sbinTypeEnum;
 		
 		public String getFileName() {
 			return fileName;
@@ -235,51 +234,48 @@ public final class DataClasses {
 			this.cdatStrings = cdatStrings;
 		}
 		
-		public List<SBinStringDataText> getStrDataTextArray() {
-			return strDataTextArray;
-		}
-		public void setStrDataTextArray(List<SBinStringDataText> strDataTextArray) {
-			this.strDataTextArray = strDataTextArray;
-		}
-		
 		public List<SBinStringDataEntry> getStrDataEntriesArray() {
 			return strDataEntriesArray;
 		}
 		public void setStrDataEntriesArray(List<SBinStringDataEntry> strDataEntriesArray) {
 			this.strDataEntriesArray = strDataEntriesArray;
 		}
-	}
-	
-	public static class SBinStringDataText {
-		@SerializedName("TextId")
-		private int textId; 
-		@SerializedName("Text")
-		private String text;
 		
-		public int getTextId() {
-			return textId;
+		public SBinType getSBinTypeEnum() {
+			return sbinTypeEnum;
 		}
-		public void setTextId(int textId) {
-			this.textId = textId;
+		public void setSBinTypeEnum(SBinType sbinTypeEnum) {
+			this.sbinTypeEnum = sbinTypeEnum;
 		}
-		
-		public String getText() {
-			return text;
-		}
-		public void setText(String text) {
-			this.text = text;
-		} 
 	}
 	
 	public static class SBinStringDataEntry {
+		@SerializedName("IsTextEntry")
+		private boolean textEntry;
+		@SerializedName("CHDRId")
+		private Long chdrId;
 		@SerializedName("StringId")
-		private String stringId; 
-		@SerializedName("TextId")
-		private int textId;
-		@SerializedName("UnkValue")
-		private String unkValue; 
-		//
-		private SBinStringDataText textObj;
+		private String stringId; // Entry
+		@SerializedName("TextValue")
+		private String textValue; // Text
+		@SerializedName("CHDRIdTextRef")
+		private Long chdrIdTextRef; // Entry
+		@SerializedName("HalVersionValue")
+		private String halVersionValue;  // Entry
+		
+		public boolean isTextEntry() {
+			return textEntry;
+		}
+		public void setTextEntry(boolean textEntry) {
+			this.textEntry = textEntry;
+		}
+		
+		public Long getCHDRId() {
+			return chdrId;
+		}
+		public void setCHDRId(Long chdrId) {
+			this.chdrId = chdrId;
+		}
 		
 		public String getStringId() {
 			return stringId;
@@ -288,25 +284,25 @@ public final class DataClasses {
 			this.stringId = stringId;
 		}
 		
-		public int getTextId() {
-			return textId;
+		public String getTextValue() {
+			return textValue;
 		}
-		public void setTextId(int textId) {
-			this.textId = textId;
-		}
-		
-		public String getUnkValue() {
-			return unkValue;
-		}
-		public void setUnkValue(String unkValue) {
-			this.unkValue = unkValue;
+		public void setTextValue(String textValue) {
+			this.textValue = textValue;
 		}
 		
-		public SBinStringDataText getTextObj() {
-			return textObj;
+		public Long getCHDRIdTextRef() {
+			return chdrIdTextRef;
 		}
-		public void setTextObj(SBinStringDataText textObj) {
-			this.textObj = textObj;
+		public void setCHDRIdTextRef(Long chdrIdTextRef) {
+			this.chdrIdTextRef = chdrIdTextRef;
+		}
+		
+		public String getHalVersionValue() {
+			return halVersionValue;
+		}
+		public void setHalVersionValue(String halVersionValue) {
+			this.halVersionValue = halVersionValue;
 		}
 	}
 }
