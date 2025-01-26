@@ -2,7 +2,7 @@ import java.io.IOException;
 
 public class main {
 
-	private static String about = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.2";
+	private static String about = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.4";
 	
 	public static void main(String[] args) throws IOException {
 		System.out.println(about);

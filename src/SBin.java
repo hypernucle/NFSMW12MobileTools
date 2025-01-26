@@ -33,6 +33,12 @@ public class SBin {
 	private static final byte[] DATA_HEADER = "DATA".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] CHDR_HEADER = "CHDR".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] CDAT_HEADER = "CDAT".getBytes(StandardCharsets.UTF_8);
+	//
+	private static final byte[] BULK_HEADER = "BULK".getBytes(StandardCharsets.UTF_8);
+	private static final byte[] BARG_HEADER = "BARG".getBytes(StandardCharsets.UTF_8);
+	//
+	private static final int DATA_COMMONBYTES = 0x24;
+	private static final int CAREER_DATA_COMMONBYTES = 0x80;
 	
 	private static int curPos = 0x0;
 	
@@ -54,35 +60,51 @@ public class SBin {
 		// ENUM (Not enough info)
 		SBinBlockObj enumBlock = processSBinBlock(sbinData, ENUM_HEADER, STRU_HEADER);		
 		sbinJson.setENUMHexStr(hexToString(enumBlock.getBlockBytes()).toUpperCase());
-		sbinJson.setENUMHexEmptyBytesCount(enumBlock.getBlockEmptyBytesCount());
+		sbinJson.setENUMHexEmptyBytesCount(Long.valueOf(enumBlock.getBlockEmptyBytesCount()));
 		// STRU (Not enough info)
 		SBinBlockObj struBlock = processSBinBlock(sbinData, STRU_HEADER, FIEL_HEADER);
 		sbinJson.setSTRUHexStr(hexToString(struBlock.getBlockBytes()).toUpperCase());
-		sbinJson.setSTRUHexEmptyBytesCount(struBlock.getBlockEmptyBytesCount());
+		sbinJson.setSTRUHexEmptyBytesCount(Long.valueOf(struBlock.getBlockEmptyBytesCount()));
 		// FIEL (Not enough info)
 		SBinBlockObj fielBlock = processSBinBlock(sbinData, FIEL_HEADER, OHDR_HEADER);	
 		sbinJson.setFIELHexStr(hexToString(fielBlock.getBlockBytes()).toUpperCase());
-		sbinJson.setFIELHexEmptyBytesCount(fielBlock.getBlockEmptyBytesCount());
+		sbinJson.setFIELHexEmptyBytesCount(Long.valueOf(fielBlock.getBlockEmptyBytesCount()));
 		// OHDR (Not enough info)
 		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, OHDR_HEADER, DATA_HEADER);		
 		sbinJson.setOHDRHexStr(hexToString(ohdrBlock.getBlockBytes()).toUpperCase());
-		sbinJson.setOHDRHexEmptyBytesCount(ohdrBlock.getBlockEmptyBytesCount());
+		sbinJson.setOHDRHexEmptyBytesCount(Long.valueOf(ohdrBlock.getBlockEmptyBytesCount()));
 		// DATA (Partial info)
 		SBinBlockObj dataBlock = processSBinBlock(sbinData, DATA_HEADER, CHDR_HEADER);	
 		sbinJson.setDATAHexStr(hexToString(dataBlock.getBlockBytes()).toUpperCase());
-		sbinJson.setDATAHexEmptyBytesCount(dataBlock.getBlockEmptyBytesCount());
+		sbinJson.setDATAHexEmptyBytesCount(Long.valueOf(dataBlock.getBlockEmptyBytesCount()));
 		// CHDR
 		SBinBlockObj chdrBlock = processSBinBlock(sbinData, CHDR_HEADER, CDAT_HEADER);
 //		sbinJson.setCHDRHexStr(hexToString(chdrBlock.getBlockBytes()).toUpperCase());
-		sbinJson.setCHDRHexEmptyBytesCount(chdrBlock.getBlockEmptyBytesCount());
+		sbinJson.setCHDRHexEmptyBytesCount(Long.valueOf(chdrBlock.getBlockEmptyBytesCount()));
+		
+		byte[] headerAfterCDAT = null;
+		if (type.equals(SBinType.TEXTURE)) {
+			headerAfterCDAT = BULK_HEADER;
+		}
 		// CDAT
-		SBinBlockObj cdatBlock = processSBinBlock(sbinData, CDAT_HEADER, null);
+		SBinBlockObj cdatBlock = processSBinBlock(sbinData, CDAT_HEADER, headerAfterCDAT);
 //		sbinJson.setCDATHexStr(hexToString(cdatBlock.getBlockBytes()).toUpperCase());
-		sbinJson.setCDATHexEmptyBytesCount(cdatBlock.getBlockEmptyBytesCount());
+		sbinJson.setCDATHexEmptyBytesCount(Long.valueOf(cdatBlock.getBlockEmptyBytesCount()));
 		sbinJson.setCDATStrings(prepareCDATStrings(chdrBlock.getBlockBytes(), cdatBlock.getBlockBytes()));
 		
 		if (type.equals(SBinType.STRINGDATA)) {
 			unpackStringData(sbinJson, dataBlock);
+		} else if (type.equals(SBinType.CAREER)) {
+			unpackCareerData(sbinJson, dataBlock);
+		} else if (type.equals(SBinType.TEXTURE)) {
+			// BULK (Partial info)
+			SBinBlockObj bulkBlock = processSBinBlock(sbinData, BULK_HEADER, BARG_HEADER);
+			sbinJson.setBULKHexStr(hexToString(bulkBlock.getBlockBytes()).toUpperCase());
+			sbinJson.setBULKHexEmptyBytesCount(Long.valueOf(bulkBlock.getBlockEmptyBytesCount()));
+			// BARG (Image data)
+			SBinBlockObj bargBlock = processSBinBlock(sbinData, BARG_HEADER, null);
+			sbinJson.setBARGHexStr(hexToString(bargBlock.getBlockBytes()).toUpperCase());
+			sbinJson.setBARGHexEmptyBytesCount(Long.valueOf(bargBlock.getBlockEmptyBytesCount()));
 		}
 		
 		sbinJson.setFileName(sbinFilePath.getFileName().toString());
@@ -102,33 +124,46 @@ public class SBin {
 
 		// ENUM (Not enough info)
 		SBinBlockObj enumBlock = createSBinBlock(sbinJsonObj.getENUMHexStr(), ENUM_HEADER);
-		enumBlock.setBlockEmptyBytesCount(sbinJsonObj.getENUMHexEmptyBytesCount());
+		enumBlock.setBlockEmptyBytesCount(sbinJsonObj.getENUMHexEmptyBytesCount().intValue());
 		byte[] finalENUM = buildSBinBlock(enumBlock);
 		// STRU (Not enough info)
 		SBinBlockObj struBlock = createSBinBlock(sbinJsonObj.getSTRUHexStr(), STRU_HEADER);
-		struBlock.setBlockEmptyBytesCount(sbinJsonObj.getSTRUHexEmptyBytesCount());
+		struBlock.setBlockEmptyBytesCount(sbinJsonObj.getSTRUHexEmptyBytesCount().intValue());
 		byte[] finalSTRU = buildSBinBlock(struBlock);
 		// FIEL (Not enough info)
 		SBinBlockObj fielBlock = createSBinBlock(sbinJsonObj.getFIELHexStr(), FIEL_HEADER);
-		fielBlock.setBlockEmptyBytesCount(sbinJsonObj.getFIELHexEmptyBytesCount());
+		fielBlock.setBlockEmptyBytesCount(sbinJsonObj.getFIELHexEmptyBytesCount().intValue());
 		byte[] finalFIEL = buildSBinBlock(fielBlock);
 		// OHDR (Not enough info)
 		SBinBlockObj ohdrBlock = createSBinBlock(sbinJsonObj.getOHDRHexStr(), OHDR_HEADER);
-		ohdrBlock.setBlockEmptyBytesCount(sbinJsonObj.getOHDRHexEmptyBytesCount());
+		ohdrBlock.setBlockEmptyBytesCount(sbinJsonObj.getOHDRHexEmptyBytesCount().intValue());
 		byte[] finalOHDR = buildSBinBlock(ohdrBlock);
 		// DATA (Partial info)
 		SBinBlockObj dataBlock = createDATABlock(sbinJsonObj, DATA_HEADER);
-		dataBlock.setBlockEmptyBytesCount(sbinJsonObj.getDATAHexEmptyBytesCount());
+		dataBlock.setBlockEmptyBytesCount(sbinJsonObj.getDATAHexEmptyBytesCount().intValue());
 		byte[] finalDATA = buildSBinBlock(dataBlock);
 		// CHDR & CDAT
 		SBinBlockObj cdatBlock = createCDATBlock(sbinJsonObj, CDAT_HEADER);
-		cdatBlock.setBlockEmptyBytesCount(sbinJsonObj.getCDATHexEmptyBytesCount());
+		cdatBlock.setBlockEmptyBytesCount(sbinJsonObj.getCDATHexEmptyBytesCount().intValue());
 		byte[] finalCDAT = buildSBinBlock(cdatBlock);
 		//
 		SBinBlockObj chdrBlock = createCHDRBlock(cdatBlock.getBlockElements(), CHDR_HEADER);
-		chdrBlock.setBlockEmptyBytesCount(sbinJsonObj.getCHDRHexEmptyBytesCount());
+		chdrBlock.setBlockEmptyBytesCount(sbinJsonObj.getCHDRHexEmptyBytesCount().intValue());
 		byte[] finalCHDR = buildSBinBlock(chdrBlock);
 		
+		ByteArrayOutputStream additionalBlocksStream = new ByteArrayOutputStream();
+		if (sbinJsonObj.getSBinTypeEnum().equals(SBinType.TEXTURE)) {
+			// BULK (Partial info)
+			SBinBlockObj bulkBlock = createSBinBlock(sbinJsonObj.getBULKHexStr(), BULK_HEADER);
+			bulkBlock.setBlockEmptyBytesCount(sbinJsonObj.getBULKHexEmptyBytesCount().intValue());
+			byte[] finalBULK = buildSBinBlock(bulkBlock);
+			additionalBlocksStream.write(finalBULK);
+			// BARG (Image data)
+			SBinBlockObj bargBlock = createSBinBlock(sbinJsonObj.getBARGHexStr(), BARG_HEADER);
+			bargBlock.setBlockEmptyBytesCount(sbinJsonObj.getBARGHexEmptyBytesCount().intValue());
+			byte[] finalBARG = buildSBinBlock(bargBlock);
+			additionalBlocksStream.write(finalBARG);
+		}
 
 		ByteArrayOutputStream fileOutputStr = new ByteArrayOutputStream();
 		fileOutputStr.write(SBIN_HEADER);
@@ -140,6 +175,7 @@ public class SBin {
 		fileOutputStr.write(finalDATA);
 		fileOutputStr.write(finalCHDR);
 		fileOutputStr.write(finalCDAT);
+		fileOutputStr.write(additionalBlocksStream.toByteArray());
 		byte[] fileBytes = fileOutputStr.toByteArray();
 
 		Files.write(Paths.get("new_" + sbinJsonObj.getFileName()), fileBytes);
@@ -316,7 +352,7 @@ public class SBin {
 	private void unpackStringData(SBinJson sbinJson, SBinBlockObj dataBlock) {
 		List<SBinStringDataEntry> strDataEntriesArray = new ArrayList<>();
 		
-		setCurPos(0x24); // Skip common bytes on DATA
+		setCurPos(DATA_COMMONBYTES); // Skip common bytes on DATA
 		int stringDataEntriesCount = byteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x4));
 		changeCurPos(0x4);
 		byte[] stringDataBytes = getBytesFromCurPos(dataBlock.getBlockBytes(), stringDataEntriesCount * 8);
@@ -358,6 +394,26 @@ public class SBin {
 		
 		// Keep only structure-related strings in CDAT output
 		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, firstStringChdrId));
+	}
+	
+	private void unpackCareerData(SBinJson sbinJson, SBinBlockObj dataBlock) {
+		// Skip garage cars count
+		sbinJson.setCareerFirstDATAByteValue(hexToString(Arrays.copyOfRange(
+				dataBlock.getBlockBytes(), CAREER_DATA_COMMONBYTES + 0x4, CAREER_DATA_COMMONBYTES + 0x8)).toUpperCase());
+		setCurPos(CAREER_DATA_COMMONBYTES); // Skip common bytes on DATA
+		int careerGarageEntriesCount = byteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x4));
+		// Get over the first DATA part with cars, and skip the first empty bytes
+		changeCurPos(0x4 + (careerGarageEntriesCount * 4) + 0x4);
+		int firstCarStringId = twoLEByteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x2));
+		
+		List<String> careerGarageCarsArray = sbinJson.getCDATStrings().subList(firstCarStringId, sbinJson.getCDATStrings().size());
+		sbinJson.setCareerGarageCarsArray(careerGarageCarsArray);
+		
+		// Cut already processed byte data
+		dataBlock.setBlockBytes(Arrays.copyOfRange(
+				dataBlock.getBlockBytes(), 0x0, CAREER_DATA_COMMONBYTES));
+		sbinJson.setDATAHexStr(hexToString(dataBlock.getBlockBytes()).toUpperCase());
+		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, firstCarStringId));
 	}
 
 	//

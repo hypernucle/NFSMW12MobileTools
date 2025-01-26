@@ -1,5 +1,5 @@
 package util;
 
 public enum SBinType {
-	COMMON, STRINGDATA, TEXTURE
+	COMMON, STRINGDATA, TEXTURE, CAREER
 }

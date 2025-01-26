@@ -76,36 +76,48 @@ public final class DataClasses {
 		@SerializedName("ENUM_HexStr")
 		private String enumHexStr; 
 		@SerializedName("ENUM_HexEmptyBytesCount")
-		private int enumHexEmptyBytesCount; 
+		private Long enumHexEmptyBytesCount; 
 		@SerializedName("STRU_HexStr")
 		private String struHexStr; 
 		@SerializedName("STRU_HexEmptyBytesCount")
-		private int struHexEmptyBytesCount; 
+		private Long struHexEmptyBytesCount; 
 		@SerializedName("FIEL_HexStr")
 		private String fielHexStr; 
 		@SerializedName("FIEL_HexEmptyBytesCount")
-		private int fielHexEmptyBytesCount; 
+		private Long fielHexEmptyBytesCount; 
 		@SerializedName("OHDR_HexStr")
 		private String ohdrHexStr; 
 		@SerializedName("OHDR_HexEmptyBytesCount")
-		private int ohdrHexEmptyBytesCount; 
+		private Long ohdrHexEmptyBytesCount; 
 		@SerializedName("DATA_HexStr")
 		private String dataHexStr; 
 		@SerializedName("DATA_HexEmptyBytesCount")
-		private int dataHexEmptyBytesCount; 
+		private Long dataHexEmptyBytesCount; 
 		@SerializedName("CHDR_HexStr")
 		private String chdrHexStr; 
 		@SerializedName("CHDR_HexEmptyBytesCount")
-		private int chdrHexEmptyBytesCount; 
+		private Long chdrHexEmptyBytesCount; 
 		@SerializedName("CDAT_HexStr")
 		private String cdatHexStr;
 		@SerializedName("CDAT_HexEmptyBytesCount")
-		private int cdatHexEmptyBytesCount;
+		private Long cdatHexEmptyBytesCount;
+		@SerializedName("BULK_HexStr")
+		private String bulkHexStr;
+		@SerializedName("BULK_HexEmptyBytesCount")
+		private Long bulkHexEmptyBytesCount;
+		@SerializedName("BARG_HexStr")
+		private String bargHexStr;
+		@SerializedName("BARG_HexEmptyBytesCount")
+		private Long bargHexEmptyBytesCount;
+		//
 		@SerializedName("CDAT_Strings")
 		private List<String> cdatStrings;
-		//
 		@SerializedName("StringData")
 		private List<SBinStringDataEntry> strDataEntriesArray;
+		@SerializedName("Career_FirstDATAByteValue")
+		private String careerFirstDATAByteValue; 
+		@SerializedName("Career_GarageCars")
+		private List<String> careerGarageCarsArray;
 		private SBinType sbinTypeEnum;
 		
 		public String getFileName() {
@@ -136,10 +148,10 @@ public final class DataClasses {
 			this.enumHexStr = enumHexStr;
 		}
 		
-		public int getENUMHexEmptyBytesCount() {
+		public Long getENUMHexEmptyBytesCount() {
 			return enumHexEmptyBytesCount;
 		}
-		public void setENUMHexEmptyBytesCount(int enumHexEmptyBytesCount) {
+		public void setENUMHexEmptyBytesCount(Long enumHexEmptyBytesCount) {
 			this.enumHexEmptyBytesCount = enumHexEmptyBytesCount;
 		}
 		
@@ -150,10 +162,10 @@ public final class DataClasses {
 			this.struHexStr = struHexStr;
 		}
 		
-		public int getSTRUHexEmptyBytesCount() {
+		public Long getSTRUHexEmptyBytesCount() {
 			return struHexEmptyBytesCount;
 		}
-		public void setSTRUHexEmptyBytesCount(int struHexEmptyBytesCount) {
+		public void setSTRUHexEmptyBytesCount(Long struHexEmptyBytesCount) {
 			this.struHexEmptyBytesCount = struHexEmptyBytesCount;
 		}
 		
@@ -164,10 +176,10 @@ public final class DataClasses {
 			this.fielHexStr = fielHexStr;
 		}
 		
-		public int getFIELHexEmptyBytesCount() {
+		public Long getFIELHexEmptyBytesCount() {
 			return fielHexEmptyBytesCount;
 		}
-		public void setFIELHexEmptyBytesCount(int fielHexEmptyBytesCount) {
+		public void setFIELHexEmptyBytesCount(Long fielHexEmptyBytesCount) {
 			this.fielHexEmptyBytesCount = fielHexEmptyBytesCount;
 		}
 		
@@ -178,10 +190,10 @@ public final class DataClasses {
 			this.ohdrHexStr = ohdrHexStr;
 		}
 		
-		public int getOHDRHexEmptyBytesCount() {
+		public Long getOHDRHexEmptyBytesCount() {
 			return ohdrHexEmptyBytesCount;
 		}
-		public void setOHDRHexEmptyBytesCount(int ohdrHexEmptyBytesCount) {
+		public void setOHDRHexEmptyBytesCount(Long ohdrHexEmptyBytesCount) {
 			this.ohdrHexEmptyBytesCount = ohdrHexEmptyBytesCount;
 		}
 		
@@ -192,10 +204,10 @@ public final class DataClasses {
 			this.dataHexStr = dataHexStr;
 		}
 		
-		public int getDATAHexEmptyBytesCount() {
+		public Long getDATAHexEmptyBytesCount() {
 			return dataHexEmptyBytesCount;
 		}
-		public void setDATAHexEmptyBytesCount(int dataHexEmptyBytesCount) {
+		public void setDATAHexEmptyBytesCount(Long dataHexEmptyBytesCount) {
 			this.dataHexEmptyBytesCount = dataHexEmptyBytesCount;
 		}
 		
@@ -206,10 +218,10 @@ public final class DataClasses {
 			this.chdrHexStr = chdrHexStr;
 		}
 		
-		public int getCHDRHexEmptyBytesCount() {
+		public Long getCHDRHexEmptyBytesCount() {
 			return chdrHexEmptyBytesCount;
 		}
-		public void setCHDRHexEmptyBytesCount(int chdrHexEmptyBytesCount) {
+		public void setCHDRHexEmptyBytesCount(Long chdrHexEmptyBytesCount) {
 			this.chdrHexEmptyBytesCount = chdrHexEmptyBytesCount;
 		}
 		
@@ -220,18 +232,60 @@ public final class DataClasses {
 			this.cdatHexStr = cdatHexStr;
 		}
 		
-		public int getCDATHexEmptyBytesCount() {
+		public Long getCDATHexEmptyBytesCount() {
 			return cdatHexEmptyBytesCount;
 		}
-		public void setCDATHexEmptyBytesCount(int cdatHexEmptyBytesCount) {
+		public void setCDATHexEmptyBytesCount(Long cdatHexEmptyBytesCount) {
 			this.cdatHexEmptyBytesCount = cdatHexEmptyBytesCount;
 		}
 		
+		public String getBULKHexStr() {
+			return bulkHexStr;
+		}
+		public void setBULKHexStr(String bulkHexStr) {
+			this.bulkHexStr = bulkHexStr;
+		}
+		
+		public Long getBULKHexEmptyBytesCount() {
+			return bulkHexEmptyBytesCount;
+		}
+		public void setBULKHexEmptyBytesCount(Long bulkHexEmptyBytesCount) {
+			this.bulkHexEmptyBytesCount = bulkHexEmptyBytesCount;
+		}
+		
+		public String getBARGHexStr() {
+			return bargHexStr;
+		}
+		public void setBARGHexStr(String bargHexStr) {
+			this.bargHexStr = bargHexStr;
+		}
+		
+		public Long getBARGHexEmptyBytesCount() {
+			return bargHexEmptyBytesCount;
+		}
+		public void setBARGHexEmptyBytesCount(Long bargHexEmptyBytesCount) {
+			this.bargHexEmptyBytesCount = bargHexEmptyBytesCount;
+		}
+		//
 		public List<String> getCDATStrings() {
 			return cdatStrings;
 		}
 		public void setCDATStrings(List<String> cdatStrings) {
 			this.cdatStrings = cdatStrings;
+		}
+		
+		public String getCareerFirstDATAByteValue() {
+			return careerFirstDATAByteValue;
+		}
+		public void setCareerFirstDATAByteValue(String careerFirstDATAByteValue) {
+			this.careerFirstDATAByteValue = careerFirstDATAByteValue;
+		}
+		
+		public List<String> getCareerGarageCarsArray() {
+			return careerGarageCarsArray;
+		}
+		public void setCareerGarageCarsArray(List<String> careerGarageCarsArray) {
+			this.careerGarageCarsArray = careerGarageCarsArray;
 		}
 		
 		public List<SBinStringDataEntry> getStrDataEntriesArray() {
