@@ -72,7 +72,7 @@ public final class DataClasses {
 		@SerializedName("SBinVersion")
 		private int sbinVersion; 
 		@SerializedName("SBinType")
-		private String sbinType; 
+		private SBinType sbinType; 
 		@SerializedName("ENUM_HexStr")
 		private String enumHexStr; 
 		@SerializedName("ENUM_HexEmptyBytesCount")
@@ -118,7 +118,6 @@ public final class DataClasses {
 		private String careerFirstDATAByteValue; 
 		@SerializedName("Career_GarageCars")
 		private List<String> careerGarageCarsArray;
-		private SBinType sbinTypeEnum;
 		
 		public String getFileName() {
 			return fileName;
@@ -134,10 +133,10 @@ public final class DataClasses {
 			this.sbinVersion = sbinVersion;
 		}
 		
-		public String getSBinType() {
+		public SBinType getSBinType() {
 			return sbinType;
 		}
-		public void setSBinType(String sbinType) {
+		public void setSBinType(SBinType sbinType) {
 			this.sbinType = sbinType;
 		}
 		
@@ -293,13 +292,6 @@ public final class DataClasses {
 		}
 		public void setStrDataEntriesArray(List<SBinStringDataEntry> strDataEntriesArray) {
 			this.strDataEntriesArray = strDataEntriesArray;
-		}
-		
-		public SBinType getSBinTypeEnum() {
-			return sbinTypeEnum;
-		}
-		public void setSBinTypeEnum(SBinType sbinTypeEnum) {
-			this.sbinTypeEnum = sbinTypeEnum;
 		}
 	}
 	
