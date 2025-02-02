@@ -35,6 +35,7 @@ public class SBin {
 	private static final byte[] CDAT_HEADER = "CDAT".getBytes(StandardCharsets.UTF_8);
 	//
 	private static final byte[] SHORTBYTE_EMPTY = decodeHexStr("0000");
+	private static final int DDS_HEADER_SIZE = 0x80;
 	//
 	private static final byte[] BULK_HEADER = "BULK".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] BARG_HEADER = "BARG".getBytes(StandardCharsets.UTF_8);
@@ -60,6 +61,9 @@ public class SBin {
 			return;
 		}
 		sbinJson.setSBinType(SBinType.valueOf(fileType.toUpperCase()));
+		sbinJson.setFileName(sbinFilePath.getFileName().toString());
+		sbinJson.setSbinVersion(sbinVersion);
+		
 		changeCurPos(0x8); // Skip SBin header + version
 
 		// ENUM (Not enough info)
@@ -107,13 +111,11 @@ public class SBin {
 			sbinJson.setBULKHexEmptyBytesCount(Long.valueOf(bulkBlock.getBlockEmptyBytesCount()));
 			// BARG (Image data)
 			SBinBlockObj bargBlock = processSBinBlock(sbinData, BARG_HEADER, null);
-			sbinJson.setBARGHexStr(hexToString(bargBlock.getBlockBytes()).toUpperCase());
+			primitiveExtractDDS(sbinJson, bargBlock.getBlockBytes());
+//			sbinJson.setBARGHexStr(hexToString(bargBlock.getBlockBytes()).toUpperCase());
 			sbinJson.setBARGHexEmptyBytesCount(Long.valueOf(bargBlock.getBlockEmptyBytesCount()));
 		}
 		
-		sbinJson.setFileName(sbinFilePath.getFileName().toString());
-		sbinJson.setSbinVersion(sbinVersion);
-
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		String jsonOut = gson.toJson(sbinJson);
 		Files.write(Paths.get(sbinJson.getFileName() + ".json"), jsonOut.getBytes(StandardCharsets.UTF_8));
@@ -162,7 +164,7 @@ public class SBin {
 			byte[] finalBULK = buildSBinBlock(bulkBlock);
 			additionalBlocksStream.write(finalBULK);
 			// BARG (Image data)
-			SBinBlockObj bargBlock = createSBinBlock(sbinJsonObj.getBARGHexStr(), BARG_HEADER);
+			SBinBlockObj bargBlock = createBARGBlock(sbinJsonObj, BARG_HEADER);
 			bargBlock.setBlockEmptyBytesCount(sbinJsonObj.getBARGHexEmptyBytesCount().intValue());
 			byte[] finalBARG = buildSBinBlock(bargBlock);
 			additionalBlocksStream.write(finalBARG);
@@ -377,6 +379,14 @@ public class SBin {
 		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, firstCarStringId));
 	}
 	
+	private void primitiveExtractDDS(SBinJson sbinJson, byte[] imageHex) throws IOException {
+		ByteArrayOutputStream ddsFileStream = new ByteArrayOutputStream();
+		byte[] headerHex = Files.readAllBytes(Paths.get("templates/dds_1024x_headertemplate"));
+		ddsFileStream.write(headerHex);
+		ddsFileStream.write(imageHex);
+		Files.write(Paths.get(sbinJson.getFileName() + ".dds"), ddsFileStream.toByteArray());
+	}
+	
 	//
 	// SBin repack functions
 	//
@@ -433,6 +443,21 @@ public class SBin {
 			prepareCareerDataForSBinBlock(dataHexStream, sbinJson);
 		}
 		block.setBlockBytes(dataHexStream.toByteArray());
+		
+		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
+		if (block.getBlockBytes().length != 0) {
+			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
+		}
+		return block;
+	}
+	
+	// Very primitive
+	private SBinBlockObj createBARGBlock(SBinJson sbinJson, byte[] header) throws IOException {
+		SBinBlockObj block = new SBinBlockObj();
+		block.setHeader(header);
+		
+		byte[] imageHex = Files.readAllBytes(Paths.get(sbinJson.getFileName() + ".dds"));
+		block.setBlockBytes(Arrays.copyOfRange(imageHex, DDS_HEADER_SIZE, imageHex.length));
 		
 		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
 		if (block.getBlockBytes().length != 0) {
