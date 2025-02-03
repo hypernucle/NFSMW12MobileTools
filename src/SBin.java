@@ -202,6 +202,45 @@ public class SBin {
 		System.out.println("FNV1 Hash: " + output);
 		System.out.println("Block Length: " + length);
 	}
+	
+	// Currently only for CarDesc
+	public void calcOHDR(int swatchCount, int isEventLocked) throws IOException {
+		ByteArrayOutputStream ohdrStream = new ByteArrayOutputStream();
+		byte[] ohdrStartBytes = Files.readAllBytes(Paths.get("templates/ohdr_cardesc_starttemplate"));
+		ohdrStream.write(ohdrStartBytes);
+		int addition = isEventLocked != 0 ? 0x20 : 0x0;
+		
+		writeBytesWithAddition(ohdrStream, 0x310, addition);
+		writeBytesWithAddition(ohdrStream, 0x4E2, addition);
+		
+		addition += 0x20 * swatchCount;
+		int baseValue = 0x530;
+		for (int i = 0; i < swatchCount; i++) {
+			if (i > 0) {addition += 0x40;}
+			writeBytesWithAddition(ohdrStream, baseValue, addition);
+			addition += 0xE0;
+			writeBytesWithAddition(ohdrStream, baseValue, addition);
+			addition += 0x40;
+			writeBytesWithAddition(ohdrStream, baseValue, addition);
+		}
+		
+		addition += 0x32;
+		writeBytesWithAddition(ohdrStream, baseValue, addition);
+		//
+		addition += 0x14E;
+		writeBytesWithAddition(ohdrStream, baseValue, addition);
+		//
+		for (int i = 0; i < 8; i++) {
+			addition += 0xA0;
+			writeBytesWithAddition(ohdrStream, baseValue, addition);
+		}
+		if (isEventLocked == 1) {
+			addition += 0x40;
+			writeBytesWithAddition(ohdrStream, baseValue, addition);
+		}
+		System.out.println("OHDR CarDesc block for " + swatchCount + " swatches, isEventLocked " + isEventLocked + ": "
+				+ hexToString(ohdrStream.toByteArray()).toUpperCase());
+	}
 
 	//
 	// SBin block methods
@@ -532,6 +571,10 @@ public class SBin {
 		for (String entry : list) {
 			blockElements.add(entry.getBytes(StandardCharsets.UTF_8));
 		}
+	}
+	
+	private void writeBytesWithAddition(ByteArrayOutputStream hexStream, int baseValue, int addition) throws IOException {
+		hexStream.write(intToByteArrayLE(baseValue + addition, 0x4));
 	}
 	
 	public static int byteArrayToInt(byte[] bytes) {
