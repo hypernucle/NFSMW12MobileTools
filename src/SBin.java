@@ -78,10 +78,10 @@ public class SBin {
 		SBinBlockObj fielBlock = processSBinBlock(sbinData, FIEL_HEADER, OHDR_HEADER);	
 		sbinJson.setFIELHexStr(hexToString(fielBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setFIELHexEmptyBytesCount(Long.valueOf(fielBlock.getBlockEmptyBytesCount()));
-		// OHDR (Not enough info)
+		// OHDR
 		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, OHDR_HEADER, DATA_HEADER);		
 		saveOHDRBlockData(sbinJson, ohdrBlock);
-		// DATA (Partial info)
+		// DATA
 		SBinBlockObj dataBlock = processSBinBlock(sbinData, DATA_HEADER, CHDR_HEADER);	
 		sbinJson.setDATAHexStr(hexToString(dataBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setDATAHexEmptyBytesCount(Long.valueOf(dataBlock.getBlockEmptyBytesCount()));
@@ -139,11 +139,11 @@ public class SBin {
 		SBinBlockObj fielBlock = createSBinBlock(sbinJsonObj.getFIELHexStr(), FIEL_HEADER);
 		fielBlock.setBlockEmptyBytesCount(sbinJsonObj.getFIELHexEmptyBytesCount().intValue());
 		byte[] finalFIEL = buildSBinBlock(fielBlock);
-		// OHDR (Not enough info)
+		// OHDR
 		SBinBlockObj ohdrBlock = createOHDRBlock(sbinJsonObj, OHDR_HEADER);
 		ohdrBlock.setBlockEmptyBytesCount(sbinJsonObj.getOHDRHexEmptyBytesCount().intValue());
 		byte[] finalOHDR = buildSBinBlock(ohdrBlock);
-		// DATA (Partial info)
+		// DATA
 		SBinBlockObj dataBlock = createDATABlock(sbinJsonObj, DATA_HEADER);
 		dataBlock.setBlockEmptyBytesCount(sbinJsonObj.getDATAHexEmptyBytesCount().intValue());
 		byte[] finalDATA = buildSBinBlock(dataBlock);
@@ -204,11 +204,11 @@ public class SBin {
 	}
 	
 	// Currently only for CarDesc
-	public void calcOHDR(int swatchCount, int isEventLocked) throws IOException {
+	public void calcOHDR(int swatchCount, int extraValueMode) throws IOException {
 		ByteArrayOutputStream ohdrStream = new ByteArrayOutputStream();
 		byte[] ohdrStartBytes = Files.readAllBytes(Paths.get("templates/ohdr_cardesc_starttemplate"));
 		ohdrStream.write(ohdrStartBytes);
-		int addition = isEventLocked != 0 ? 0x20 : 0x0;
+		int addition = extraValueMode != 0 ? 0x20 : 0x0;
 		
 		writeBytesWithAddition(ohdrStream, 0x310, addition);
 		writeBytesWithAddition(ohdrStream, 0x4E2, addition);
@@ -234,11 +234,12 @@ public class SBin {
 			addition += 0xA0;
 			writeBytesWithAddition(ohdrStream, baseValue, addition);
 		}
-		if (isEventLocked == 1) {
+		if (extraValueMode != 0) {
 			addition += 0x40;
+			if (extraValueMode == 2) {addition += 0x20;}
 			writeBytesWithAddition(ohdrStream, baseValue, addition);
 		}
-		System.out.println("OHDR CarDesc block for " + swatchCount + " swatches, isEventLocked " + isEventLocked + ": "
+		System.out.println("OHDR CarDesc block for " + swatchCount + " swatches, extraValueMode " + extraValueMode + ": "
 				+ hexToString(ohdrStream.toByteArray()).toUpperCase());
 	}
 
