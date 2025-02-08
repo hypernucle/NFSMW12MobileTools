@@ -110,8 +110,10 @@ public final class DataClasses {
 		@SerializedName("BARG_HexEmptyBytesCount")
 		private Long bargHexEmptyBytesCount;
 		//
+		@SerializedName("DATA_Elements")
+		private List<SBinDataElement> dataElements;
 		@SerializedName("CDAT_Strings")
-		private List<String> cdatStrings;
+		private List<SBinCDATEntry> cdatStrings;
 		@SerializedName("StringData")
 		private List<SBinStringDataEntry> strDataEntriesArray;
 		@SerializedName("Career_FirstDATAByteValue")
@@ -266,10 +268,10 @@ public final class DataClasses {
 			this.bargHexEmptyBytesCount = bargHexEmptyBytesCount;
 		}
 		//
-		public List<String> getCDATStrings() {
+		public List<SBinCDATEntry> getCDATStrings() {
 			return cdatStrings;
 		}
-		public void setCDATStrings(List<String> cdatStrings) {
+		public void setCDATStrings(List<SBinCDATEntry> cdatStrings) {
 			this.cdatStrings = cdatStrings;
 		}
 		
@@ -293,6 +295,34 @@ public final class DataClasses {
 		public void setStrDataEntriesArray(List<SBinStringDataEntry> strDataEntriesArray) {
 			this.strDataEntriesArray = strDataEntriesArray;
 		}
+		
+		public List<SBinDataElement> getDataElements() {
+			return dataElements;
+		}
+		public void setDataElements(List<SBinDataElement> dataElements) {
+			this.dataElements = dataElements;
+		}
+	}
+	
+	public static class SBinCDATEntry {
+		@SerializedName("CHDRHexId")
+		private String chdrHexId; // Only for info
+		@SerializedName("String")
+		private String string;
+		
+		public String getChdrHexId() {
+			return chdrHexId;
+		}
+		public void setChdrHexId(String chdrHexId) {
+			this.chdrHexId = chdrHexId;
+		}
+		
+		public String getString() {
+			return string;
+		}
+		public void setString(String string) {
+			this.string = string;
+		} 
 	}
 	
 	public static class SBinStringDataEntry {
@@ -349,6 +379,36 @@ public final class DataClasses {
 		}
 		public void setHalVersionValue(String halVersionValue) {
 			this.halVersionValue = halVersionValue;
+		}
+	}
+	
+	public static class SBinDataElement {
+		@SerializedName("OrderId")
+		private int orderId = 0; // Only for info
+		@SerializedName("OHDRUnkRemainder")
+		private int ohdrUnkRemainder = 0;
+		@SerializedName("HexValue")
+		private String hexValue;
+		
+		public int getOrderId() {
+			return orderId;
+		}
+		public void setOrderId(int orderId) {
+			this.orderId = orderId;
+		}
+		
+		public int getOhdrUnkRemainder() {
+			return ohdrUnkRemainder;
+		}
+		public void setOhdrUnkRemainder(int ohdrUnkRemainder) {
+			this.ohdrUnkRemainder = ohdrUnkRemainder;
+		}
+		
+		public String getHexValue() {
+			return hexValue;
+		}
+		public void setHexValue(String hexValue) {
+			this.hexValue = hexValue;
 		}
 	}
 }
