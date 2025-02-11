@@ -78,31 +78,31 @@ public class SBin {
 		SBinBlockObj fielBlock = processSBinBlock(sbinData, FIEL_HEADER, OHDR_HEADER);	
 		sbinJson.setFIELHexStr(hexToString(fielBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setFIELHexEmptyBytesCount(Long.valueOf(fielBlock.getBlockEmptyBytesCount()));
-		// OHDR
+		// OHDR: map of DATA block
 		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, OHDR_HEADER, DATA_HEADER);		
 		saveOHDRBlockData(sbinJson, ohdrBlock);
-		// DATA
+		// DATA: various objects info
 		SBinBlockObj dataBlock = processSBinBlock(sbinData, DATA_HEADER, CHDR_HEADER);	
-//		sbinJson.setDATAHexStr(hexToString(dataBlock.getBlockBytes()).toUpperCase());
 		parseDATABlock(sbinJson, ohdrBlock, dataBlock);
 		sbinJson.setDATAHexEmptyBytesCount(Long.valueOf(dataBlock.getBlockEmptyBytesCount()));
-		// CHDR
+		// CHDR: map of CDAT block
 		SBinBlockObj chdrBlock = processSBinBlock(sbinData, CHDR_HEADER, CDAT_HEADER);
-//		sbinJson.setCHDRHexStr(hexToString(chdrBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setCHDRHexEmptyBytesCount(Long.valueOf(chdrBlock.getBlockEmptyBytesCount()));
 		
-		// CDAT
+		// CDAT: field names & string variables
 		SBinBlockObj cdatBlock = processSBinBlock(sbinData, CDAT_HEADER, 
 				sbinJson.getSBinType() == SBinType.TEXTURE ? BULK_HEADER : null);
-//		sbinJson.setCDATHexStr(hexToString(cdatBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setCDATHexEmptyBytesCount(Long.valueOf(cdatBlock.getBlockEmptyBytesCount()));
 		sbinJson.setCDATStrings(prepareCDATStrings(chdrBlock.getBlockBytes(), cdatBlock.getBlockBytes()));
 		
-		if (sbinJson.getSBinType() == SBinType.STRINGDATA) {
+		switch(sbinJson.getSBinType()) {
+		case STRINGDATA:
 			unpackStringData(sbinJson, dataBlock);
-		} else if (sbinJson.getSBinType() == SBinType.CAREER) {
+			break;
+		case CAREER:
 			unpackCareerData(sbinJson, dataBlock);
-		} else if (sbinJson.getSBinType() == SBinType.TEXTURE) {
+			break;
+		case TEXTURE:
 			// BULK (Partial info)
 			SBinBlockObj bulkBlock = processSBinBlock(sbinData, BULK_HEADER, BARG_HEADER);
 			sbinJson.setBULKHexStr(hexToString(bulkBlock.getBlockBytes()).toUpperCase());
@@ -110,8 +110,9 @@ public class SBin {
 			// BARG (Image data)
 			SBinBlockObj bargBlock = processSBinBlock(sbinData, BARG_HEADER, null);
 			primitiveExtractDDS(sbinJson, bargBlock.getBlockBytes());
-//			sbinJson.setBARGHexStr(hexToString(bargBlock.getBlockBytes()).toUpperCase());
 			sbinJson.setBARGHexEmptyBytesCount(Long.valueOf(bargBlock.getBlockEmptyBytesCount()));
+			break;
+		default: break;
 		}
 		
 		gson = new GsonBuilder().setPrettyPrinting().create();
@@ -201,7 +202,7 @@ public class SBin {
 		System.out.println("Block Length: " + length);
 	}
 	
-	// Currently only for CarDesc
+	// Currently only for CarDesc. Old method
 	public void calcOHDR(int swatchCount, int extraValueMode) throws IOException {
 		ByteArrayOutputStream ohdrStream = new ByteArrayOutputStream();
 		byte[] ohdrStartBytes = Files.readAllBytes(Paths.get("templates/ohdr_cardesc_starttemplate"));
@@ -300,6 +301,13 @@ public class SBin {
 		sbinJson.setOHDRHexEmptyBytesCount(Long.valueOf(ohdrBlock.getBlockEmptyBytesCount()));
 	}
 	
+	private void setSBinBlockAttributes(SBinBlockObj block) {
+		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
+		if (block.getBlockBytes().length != 0) {
+			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
+		}
+	}
+	
 	//
 	// SBin unpack functions
 	//
@@ -373,10 +381,7 @@ public class SBin {
 		}
 		block.setBlockBytes(stringsHexStream.toByteArray());
 		
-		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
-		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
-		}
+		setSBinBlockAttributes(block);
 		return block;
 	}
 	
@@ -478,10 +483,7 @@ public class SBin {
 		}
 		block.setBlockBytes(chdrHexStream.toByteArray());
 		
-		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
-		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
-		}
+		setSBinBlockAttributes(block);
 		return block;
 	}
 	
@@ -495,7 +497,8 @@ public class SBin {
 		for (int i = 0; i < sbinJson.getDataElements().size() - 1; i++) {
 			SBinDataElement element = sbinJson.getDataElements().get(i);
 			int entryLength = decodeHexStr(element.getHexValue()).length;
-			// TODO I don't know why some of OHDR entries have a small remainder in values 
+			// I don't know why some of OHDR entries have a small remainder in values.
+			// Adding it as it is works well, usually
 			ohdrByteLength += entryLength * 0x8;
 			ohdrHexStream.write(intToByteArrayLE(ohdrByteLength + element.getOhdrUnkRemainder(), 0x4));
 		} // Ignore last DATA element - last OHDR entry ends on DATA length
@@ -505,10 +508,7 @@ public class SBin {
 		}
 		block.setBlockBytes(ohdrHexStream.toByteArray());
 		
-		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
-		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
-		}
+		setSBinBlockAttributes(block);
 		return block;
 	}
 	
@@ -519,19 +519,20 @@ public class SBin {
 		ByteArrayOutputStream dataHexStream = new ByteArrayOutputStream();
 		for (SBinDataElement dataEntry : sbinJson.getDataElements()) {
 			dataHexStream.write(decodeHexStr(dataEntry.getHexValue()));
-		}
+		} // Save common or unknown DATA info
 		
-		if (sbinJson.getSBinType() == SBinType.STRINGDATA) {
+		switch(sbinJson.getSBinType()) {
+		case STRINGDATA:
 			prepareStringDataForSBinBlock(dataHexStream, sbinJson.getStrDataEntriesArray());
-		} else if (sbinJson.getSBinType() == SBinType.CAREER) {
+			break;
+		case CAREER:
 			prepareCareerDataForSBinBlock(dataHexStream, sbinJson);
+			break;
+		default: break;
 		}
 		block.setBlockBytes(dataHexStream.toByteArray());
 		
-		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
-		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
-		}
+		setSBinBlockAttributes(block);
 		return block;
 	}
 	
@@ -543,10 +544,7 @@ public class SBin {
 		byte[] imageHex = Files.readAllBytes(Paths.get(sbinJson.getFileName() + ".dds"));
 		block.setBlockBytes(Arrays.copyOfRange(imageHex, DDS_HEADER_SIZE, imageHex.length));
 		
-		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
-		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
-		}
+		setSBinBlockAttributes(block);
 		return block;
 	}
 	
