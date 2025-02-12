@@ -1,11 +1,18 @@
 package util;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.google.gson.annotations.SerializedName;
 
 public final class DataClasses {
 	private DataClasses() {}
+	
+	private static final byte[] SHORT_EMPTYBYTES = new byte[2];
+	private static final byte[] INT_EMPTYBYTES = new byte[4];
+	private static final int OHDR_MULTIPLIER = 0x8;
 	
 	public static class SBinBlockObj {
 		private byte[] header;
@@ -15,6 +22,11 @@ public final class DataClasses {
 		private int blockEmptyBytesCount = 0;
 		private byte[] blockBytes = new byte[0];
 		private List<byte[]> blockElements;
+		private List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
+		
+		public void addToOHDRMapTemplate(Integer entrySize, Integer remainder) {
+			this.ohdrMapTemplate.add(new SBinOHDREntry(entrySize, remainder));
+		}
 		
 		public byte[] getHeader() {
 			return header;
@@ -63,6 +75,299 @@ public final class DataClasses {
 		}
 		public void setBlockElements(List<byte[]> blockElements) {
 			this.blockElements = blockElements;
+		}
+
+		public List<SBinOHDREntry> getOHDRMapTemplate() {
+			return ohdrMapTemplate;
+		}
+		public void setOHDRMapTemplate(List<SBinOHDREntry> ohdrMapTemplate) {
+			this.ohdrMapTemplate = ohdrMapTemplate;
+		}
+	}
+	
+	public static class SBinOHDREntry {
+		private int value;
+		private int remainder;
+		
+		public SBinOHDREntry(int value, int remainder) {
+			this.value = value * OHDR_MULTIPLIER;
+			this.remainder = remainder;
+		}
+		
+		public int getValue() {
+			return value;
+		}
+		public void setValue(int value) {
+			this.value = value * OHDR_MULTIPLIER;
+		}
+		
+		public int getRemainder() {
+			return remainder;
+		}
+		public void setRemainder(int remainder) {
+			this.remainder = remainder;
+		}
+	}
+	
+	public static class SBinStructureEntryHex {
+		private byte[] header = INT_EMPTYBYTES;
+		private byte[] size = INT_EMPTYBYTES;
+		private List<byte[]> dataIds = new ArrayList<>();
+		private byte[] padding = SHORT_EMPTYBYTES;
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.header);
+			bytes.write(this.size);
+			for (byte[] obj : this.dataIds) {
+				bytes.write(obj);
+			}
+			bytes.write(this.padding);
+			return bytes.toByteArray();
+		}
+		
+		public void addToDataIds(byte[] dataId) {
+			this.dataIds.add(dataId);
+		}
+		
+		public Integer getByteSize() {
+			return 0x8 + (this.dataIds.size() * 4) + 0x2;
+		}
+		
+		public byte[] getHeader() {
+			return header;
+		}
+		public void setHeader(byte[] header) {
+			this.header = header;
+		}
+		
+		public byte[] getSize() {
+			return size;
+		}
+		public void setSize(byte[] size) {
+			this.size = size;
+		}
+		
+		public List<byte[]> getDataIds() {
+			return dataIds;
+		}
+		public void setDataIds(List<byte[]> dataIds) {
+			this.dataIds = dataIds;
+		}
+		
+		public byte[] getPadding() {
+			return padding;
+		}
+		public void setPadding(byte[] padding) {
+			this.padding = padding;
+		}
+	}
+	
+	public static class SBinAchievementEntryHex {
+		private int ohdrUnkRemainder = 0;
+		private byte[] padding1 = SHORT_EMPTYBYTES;
+		private byte[] name = SHORT_EMPTYBYTES;
+		private byte[] desc = SHORT_EMPTYBYTES;
+		private byte[] points = INT_EMPTYBYTES;
+		private byte[] autologAwardId = SHORT_EMPTYBYTES;
+		private byte[] padding2 = SHORT_EMPTYBYTES;
+		private byte[] categoryId = INT_EMPTYBYTES;
+		private byte[] metricId = INT_EMPTYBYTES;
+		private byte[] metricTarget = INT_EMPTYBYTES;
+		private byte[] imageName = SHORT_EMPTYBYTES;
+		private byte[] imageText = SHORT_EMPTYBYTES;
+		private byte[] orderId = SHORT_EMPTYBYTES;
+		private byte[] padding3 = SHORT_EMPTYBYTES;
+		private SBinStructureEntryHex metricMilestonesMap;
+		private List<SBinAchievementMilestoneEntryHex> metricMilestones = new ArrayList<>();
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.padding1);
+			bytes.write(this.name);
+			bytes.write(this.desc);
+			bytes.write(this.points);
+			bytes.write(this.autologAwardId);
+			bytes.write(this.padding2);
+			bytes.write(this.categoryId);
+			bytes.write(this.metricId);
+			bytes.write(this.metricTarget);
+			bytes.write(this.imageName);
+			bytes.write(this.imageText);
+			bytes.write(this.orderId);
+			bytes.write(this.padding3);
+			bytes.write(this.metricMilestonesMap.toByteArray());
+			for (SBinAchievementMilestoneEntryHex obj : this.metricMilestones) {
+				bytes.write(obj.toByteArray());
+			}
+			return bytes.toByteArray();
+		}
+		
+		public List<SBinOHDREntry> ohdrMapTemplate() {
+			List<SBinOHDREntry> ohdrEntries = new ArrayList<>();
+			ohdrEntries.add(new SBinOHDREntry(0x22, this.ohdrUnkRemainder));
+			ohdrEntries.add(new SBinOHDREntry(this.metricMilestonesMap.getByteSize(), 0));
+			for (SBinAchievementMilestoneEntryHex obj : this.metricMilestones) {
+				ohdrEntries.add(new SBinOHDREntry(obj.getByteSize(), 0));
+			}
+			return ohdrEntries;
+		}
+		
+		public void addToMetricMilestones(SBinAchievementMilestoneEntryHex milestoneObj) {
+			this.metricMilestones.add(milestoneObj);
+		}
+		
+		public int getOhdrUnkRemainder() {
+			return ohdrUnkRemainder;
+		}
+		public void setOhdrUnkRemainder(int ohdrUnkRemainder) {
+			this.ohdrUnkRemainder = ohdrUnkRemainder;
+		}
+
+		public byte[] getPadding1() {
+			return padding1;
+		}
+		public void setPadding1(byte[] padding1) {
+			this.padding1 = padding1;
+		}
+		
+		public byte[] getName() {
+			return name;
+		}
+		public void setName(byte[] name) {
+			this.name = name;
+		}
+		
+		public byte[] getDesc() {
+			return desc;
+		}
+		public void setDesc(byte[] desc) {
+			this.desc = desc;
+		}
+		
+		public byte[] getPoints() {
+			return points;
+		}
+		public void setPoints(byte[] points) {
+			this.points = points;
+		}
+		
+		public byte[] getAutologAwardId() {
+			return autologAwardId;
+		}
+		public void setAutologAwardId(byte[] autologAwardId) {
+			this.autologAwardId = autologAwardId;
+		}
+		
+		public byte[] getPadding2() {
+			return padding2;
+		}
+		public void setPadding2(byte[] padding2) {
+			this.padding2 = padding2;
+		}
+		
+		public byte[] getCategoryId() {
+			return categoryId;
+		}
+		public void setCategoryId(byte[] categoryId) {
+			this.categoryId = categoryId;
+		}
+		
+		public byte[] getMetricId() {
+			return metricId;
+		}
+		public void setMetricId(byte[] metricId) {
+			this.metricId = metricId;
+		}
+		
+		public byte[] getMetricTarget() {
+			return metricTarget;
+		}
+		public void setMetricTarget(byte[] metricTarget) {
+			this.metricTarget = metricTarget;
+		}
+		
+		public byte[] getImageName() {
+			return imageName;
+		}
+		public void setImageName(byte[] imageName) {
+			this.imageName = imageName;
+		}
+		
+		public byte[] getImageText() {
+			return imageText;
+		}
+		public void setImageText(byte[] imageText) {
+			this.imageText = imageText;
+		}
+		
+		public byte[] getOrderId() {
+			return orderId;
+		}
+		public void setOrderId(byte[] orderId) {
+			this.orderId = orderId;
+		}
+		
+		public byte[] getPadding3() {
+			return padding3;
+		}
+		public void setPadding3(byte[] padding3) {
+			this.padding3 = padding3;
+		}
+		
+		public SBinStructureEntryHex getMetricMilestonesMap() {
+			return metricMilestonesMap;
+		}
+		public void setMetricMilestonesMap(SBinStructureEntryHex metricMilestonesMap) {
+			this.metricMilestonesMap = metricMilestonesMap;
+		}
+		
+		public List<SBinAchievementMilestoneEntryHex> getMetricMilestones() {
+			return metricMilestones;
+		}
+		public void setMetricMilestones(List<SBinAchievementMilestoneEntryHex> metricMilestones) {
+			this.metricMilestones = metricMilestones;
+		}
+	}
+	
+	public static class SBinAchievementMilestoneEntryHex {
+		private byte[] header = SHORT_EMPTYBYTES;
+		private byte[] intValue = INT_EMPTYBYTES;
+		private byte[] padding = SHORT_EMPTYBYTES;
+		
+		private int byteSize = 0x8;
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.header);
+			bytes.write(this.intValue);
+			bytes.write(this.padding);
+			return bytes.toByteArray();
+		}
+		
+		public Integer getByteSize() {
+			return this.byteSize;
+		}
+		
+		public byte[] getHeader() {
+			return header;
+		}
+		public void setHeader(byte[] header) {
+			this.header = header;
+		}
+		
+		public byte[] getIntValue() {
+			return intValue;
+		}
+		public void setIntValue(byte[] intValue) {
+			this.intValue = intValue;
+		}
+		
+		public byte[] getPadding() {
+			return padding;
+		}
+		public void setPadding(byte[] padding) {
+			this.padding = padding;
 		}
 	}
 	
@@ -120,6 +425,8 @@ public final class DataClasses {
 		private String careerFirstDATAByteValue; 
 		@SerializedName("Career_GarageCars")
 		private List<String> careerGarageCarsArray;
+		@SerializedName("AchievementData")
+		private List<SBinAchievementEntry> achievementArray;
 		
 		public String getFileName() {
 			return fileName;
@@ -302,6 +609,13 @@ public final class DataClasses {
 		public void setDataElements(List<SBinDataElement> dataElements) {
 			this.dataElements = dataElements;
 		}
+		
+		public List<SBinAchievementEntry> getAchievementArray() {
+			return achievementArray;
+		}
+		public void setAchievementArray(List<SBinAchievementEntry> achievementArray) {
+			this.achievementArray = achievementArray;
+		}
 	}
 	
 	public static class SBinCDATEntry {
@@ -409,6 +723,108 @@ public final class DataClasses {
 		}
 		public void setHexValue(String hexValue) {
 			this.hexValue = hexValue;
+		}
+	}
+	
+	public static class SBinAchievementEntry {
+		@SerializedName("OHDRUnkRemainder")
+		private int ohdrUnkRemainder = 0;
+		@SerializedName("Name_CHDRIdRef")
+		private int nameCHDRIdRef;
+		@SerializedName("Desc_CHDRIdRef")
+		private int descCHDRIdRef;
+		@SerializedName("Points_Int")
+		private int pointsInt;
+		@SerializedName("AutologAwardId_CHDRIdRef")
+		private int autologAwardIdCHDRIdRef;
+		@SerializedName("CategoryId_Int")
+		private int categoryId;
+		@SerializedName("MetricId_Int")
+		private int metricId;
+		@SerializedName("MetricTarget_Int")
+		private int metricTargetInt;
+		@SerializedName("ImageName_CHDRIdRef")
+		private int imageNameCHDRIdRef;
+		@SerializedName("ImageText_CHDRIdRef")
+		private int imageTextCHDRIdRef;
+		@SerializedName("MetricMilestones")
+		private List<Integer> metricMilestones;
+		
+		public int getOhdrUnkRemainder() {
+			return ohdrUnkRemainder;
+		}
+		public void setOhdrUnkRemainder(int ohdrUnkRemainder) {
+			this.ohdrUnkRemainder = ohdrUnkRemainder;
+		}
+		
+		public int getNameCHDRIdRef() {
+			return nameCHDRIdRef;
+		}
+		public void setNameCHDRIdRef(int nameCHDRIdRef) {
+			this.nameCHDRIdRef = nameCHDRIdRef;
+		}
+		
+		public int getDescCHDRIdRef() {
+			return descCHDRIdRef;
+		}
+		public void setDescCHDRIdRef(int descCHDRIdRef) {
+			this.descCHDRIdRef = descCHDRIdRef;
+		}
+		
+		public int getPointsInt() {
+			return pointsInt;
+		}
+		public void setPointsInt(int pointsInt) {
+			this.pointsInt = pointsInt;
+		}
+		
+		public int getAutologAwardIdCHDRIdRef() {
+			return autologAwardIdCHDRIdRef;
+		}
+		public void setAutologAwardIdCHDRIdRef(int autologAwardIdCHDRIdRef) {
+			this.autologAwardIdCHDRIdRef = autologAwardIdCHDRIdRef;
+		}
+		
+		public int getCategoryId() {
+			return categoryId;
+		}
+		public void setCategoryId(int categoryId) {
+			this.categoryId = categoryId;
+		}
+		
+		public int getMetricId() {
+			return metricId;
+		}
+		public void setMetricId(int metricId) {
+			this.metricId = metricId;
+		}
+		
+		public int getMetricTargetInt() {
+			return metricTargetInt;
+		}
+		public void setMetricTargetInt(int metricTargetInt) {
+			this.metricTargetInt = metricTargetInt;
+		}
+		
+		public int getImageNameCHDRIdRef() {
+			return imageNameCHDRIdRef;
+		}
+		public void setImageNameCHDRIdRef(int imageNameCHDRIdRef) {
+			this.imageNameCHDRIdRef = imageNameCHDRIdRef;
+		}
+		
+		public int getImageTextCHDRIdRef() {
+			return imageTextCHDRIdRef;
+		}
+		public void setImageTextCHDRIdRef(int imageTextCHDRIdRef) {
+			this.imageTextCHDRIdRef = imageTextCHDRIdRef;
+		}
+		
+		public List<Integer> getMetricMilestones() {
+			return metricMilestones;
+		}
+		public void setMetricMilestones(List<Integer> metricMilestones) {
+			this.metricMilestones = metricMilestones;
 		}
 	}
 }

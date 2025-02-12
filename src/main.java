@@ -2,12 +2,14 @@ import java.io.IOException;
 
 public class main {
 
-	private static String about = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.6"
+	private static String about = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.7"
 			+ "\nUsage examples:"
 			+ "\n\t# Career Garage car list (full support):"
 			+ "\n\t\t'unpack career career.prefabs.sb', 'repack career.prefabs.sb.json'"
 			+ "\n\t# Text Localizations editor (full support):"
 			+ "\n\t\t'unpack stringdata nfsmw_android.sb', 'repack nfsmw_android.sb.json'"
+			+ "\n\t# Achievements editor (full support):"
+			+ "\n\t\t'unpack achievements achievements.prefabs.sb', 'repack achievements.prefabs.sb.json'"
 			+ "\n\t# Basic SBin file repacker (HEX-edits if you know what to do):"
 			+ "\n\t\t'unpack common event_01_race.prefabs.sb', 'repack event_01_race.prefabs.sb.json'"
 			+ "\n\t# Primitive texture replacer (!!! expects ONLY 1024x A8B8G8R8 .dds & .sba):"

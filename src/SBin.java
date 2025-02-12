@@ -34,7 +34,7 @@ public class SBin {
 	private static final byte[] CHDR_HEADER = "CHDR".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] CDAT_HEADER = "CDAT".getBytes(StandardCharsets.UTF_8);
 	//
-	private static final byte[] SHORTBYTE_EMPTY = decodeHexStr("0000");
+	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
 	private static final int DDS_HEADER_SIZE = 0x80;
 	//
 	private static final byte[] BULK_HEADER = "BULK".getBytes(StandardCharsets.UTF_8);
@@ -102,6 +102,9 @@ public class SBin {
 		case CAREER:
 			unpackCareerData(sbinJson, dataBlock);
 			break;
+		case ACHIEVEMENTS:
+			unpackAchievementsData(sbinJson, dataBlock);
+			break;
 		case TEXTURE:
 			// BULK (Partial info)
 			SBinBlockObj bulkBlock = processSBinBlock(sbinData, BULK_HEADER, BARG_HEADER);
@@ -143,7 +146,7 @@ public class SBin {
 		dataBlock.setBlockEmptyBytesCount(sbinJsonObj.getDATAHexEmptyBytesCount().intValue());
 		byte[] finalDATA = buildSBinBlock(dataBlock);
 		//
-		SBinBlockObj ohdrBlock = createOHDRBlock(sbinJsonObj, OHDR_HEADER);
+		SBinBlockObj ohdrBlock = createOHDRBlock(sbinJsonObj, dataBlock, OHDR_HEADER);
 		ohdrBlock.setBlockEmptyBytesCount(sbinJsonObj.getOHDRHexEmptyBytesCount().intValue());
 		byte[] finalOHDR = buildSBinBlock(ohdrBlock);
 		// CHDR & CDAT
@@ -308,6 +311,27 @@ public class SBin {
 		}
 	}
 	
+	// Some DATA entries ends with short "00 00" instead of 4 bytes
+	private List<byte[]> readDATABlockObjectMap(byte[] map) {
+		List<byte[]> entries = new ArrayList<>();
+		int entriesCount = byteArrayToInt(Arrays.copyOfRange(map, 4, 8));
+		if (entriesCount != 0) {
+			byte[] mapEntries = Arrays.copyOfRange(map, 8, map.length);
+			
+			for (int i = 0; i < entriesCount; i++) {
+				int offset = 4 * i;
+				entries.add(Arrays.copyOfRange(mapEntries, offset, 4 + offset));
+			}
+		}
+		return entries;
+	}
+	
+	private void subLast2BytesOHDR(SBinBlockObj block) {
+		int index = block.getOHDRMapTemplate().size() - 1;
+		SBinOHDREntry lastOHDREntry = block.getOHDRMapTemplate().get(index);
+		lastOHDREntry.setValue(lastOHDREntry.getValue() - 0xE);
+	}
+	
 	//
 	// SBin unpack functions
 	//
@@ -317,6 +341,7 @@ public class SBin {
 		ohdrPosDataBytes.remove(0); // First one is always 0x1
 		ohdrPosDataBytes.add(intToByteArrayLE(dataBlock.getBlockBytes().length * 0x8, 0x4)); // Create a fake last one, same as DATA size
 		List<SBinDataElement> sbinDataElements = new ArrayList<>();
+		List<byte[]> blockElements = new ArrayList<>();
 		
 		int ohdrPrevValue = 0;
 		int i = 0;
@@ -330,11 +355,13 @@ public class SBin {
 			element.setOrderId(i);
 			element.setOhdrUnkRemainder(elementOHDR - (elementBegin * 0x8));
 			sbinDataElements.add(element);
+			blockElements.add(elementHex); // For internal use
 			
 			ohdrPrevValue = elementBegin;
 			i++;
 		}
 		sbinJson.setDataElements(sbinDataElements);
+		dataBlock.setBlockElements(blockElements);
 	}
 	
 	private List<SBinCDATEntry> prepareCDATStrings(byte[] chdrBytes, byte[] cdatBytes) {
@@ -456,6 +483,42 @@ public class SBin {
 		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, firstCarStringId));
 	}
 	
+	private void unpackAchievementsData(SBinJson sbinJson, SBinBlockObj dataBlock) {
+		List<SBinAchievementEntry> achievementsArray = new ArrayList<>();
+		
+		List<byte[]> achievementsMap = readDATABlockObjectMap(dataBlock.getBlockElements().get(8));
+		// First entry is a header, second is int size
+		for (byte[] dataId : achievementsMap) {
+			int dataIndex = byteArrayToInt(dataId);
+			byte[] achiHex = dataBlock.getBlockElements().get(dataIndex);
+			SBinAchievementEntry achievement = new SBinAchievementEntry();
+			
+			achievement.setOhdrUnkRemainder(sbinJson.getDataElements().get(dataIndex).getOhdrUnkRemainder());
+			achievement.setNameCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 2, 4)));
+			achievement.setDescCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 4, 6)));
+			achievement.setPointsInt(byteArrayToInt(Arrays.copyOfRange(achiHex, 6, 10)));
+			achievement.setAutologAwardIdCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 10, 12)));
+			achievement.setCategoryId(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 14, 16)));
+			achievement.setMetricId(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 18, 20)));
+			achievement.setMetricTargetInt(byteArrayToInt(Arrays.copyOfRange(achiHex, 22, 26)));
+			achievement.setImageNameCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 26, 28)));
+			achievement.setImageTextCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 28, 30)));
+			
+			byte[] metricMilestonesMap = dataBlock.getBlockElements().get(dataIndex + 1);
+			List<Integer> metricMilestones = new ArrayList<>();
+			List<byte[]> metricMilestonesEntries = readDATABlockObjectMap(metricMilestonesMap);
+			for (byte[] milestoneDataId : metricMilestonesEntries) {
+				byte[] milestoneHexData = dataBlock.getBlockElements().get(byteArrayToInt(milestoneDataId));
+				metricMilestones.add(byteArrayToInt(Arrays.copyOfRange(milestoneHexData, 2, 6)));
+			}
+			achievement.setMetricMilestones(metricMilestones);
+			achievementsArray.add(achievement);
+		}
+		sbinJson.setAchievementArray(achievementsArray);
+		
+		sbinJson.setDataElements(sbinJson.getDataElements().subList(0, 8));
+	}
+	
 	private void primitiveExtractDDS(SBinJson sbinJson, byte[] imageHex) throws IOException {
 		ByteArrayOutputStream ddsFileStream = new ByteArrayOutputStream();
 		byte[] headerHex = Files.readAllBytes(Paths.get("templates/dds_1024x_headertemplate"));
@@ -487,20 +550,20 @@ public class SBin {
 		return block;
 	}
 	
-	private SBinBlockObj createOHDRBlock(SBinJson sbinJson, byte[] header) throws IOException {
+	private SBinBlockObj createOHDRBlock(SBinJson sbinJson, SBinBlockObj dataBlock, byte[] header) throws IOException {
 		SBinBlockObj block = new SBinBlockObj();
 		block.setHeader(header);
 		
 		ByteArrayOutputStream ohdrHexStream = new ByteArrayOutputStream();
 		ohdrHexStream.write(intToByteArrayLE(0x1, 0x4)); // First element in OHDR
 		int ohdrByteLength = 0x0;
-		for (int i = 0; i < sbinJson.getDataElements().size() - 1; i++) {
-			SBinDataElement element = sbinJson.getDataElements().get(i);
-			int entryLength = decodeHexStr(element.getHexValue()).length;
+		for (int i = 0; i < dataBlock.getOHDRMapTemplate().size() - 1; i++) {
+			SBinOHDREntry entry = dataBlock.getOHDRMapTemplate().get(i);
+			int entryLength = entry.getValue();
 			// I don't know why some of OHDR entries have a small remainder in values.
 			// Adding it as it is works well, usually
-			ohdrByteLength += entryLength * 0x8;
-			ohdrHexStream.write(intToByteArrayLE(ohdrByteLength + element.getOhdrUnkRemainder(), 0x4));
+			ohdrByteLength += entryLength;
+			ohdrHexStream.write(intToByteArrayLE(ohdrByteLength + entry.getRemainder(), 0x4));
 		} // Ignore last DATA element - last OHDR entry ends on DATA length
 		
 		if (sbinJson.getSBinType() == SBinType.CAREER) {
@@ -518,7 +581,9 @@ public class SBin {
 		
 		ByteArrayOutputStream dataHexStream = new ByteArrayOutputStream();
 		for (SBinDataElement dataEntry : sbinJson.getDataElements()) {
-			dataHexStream.write(decodeHexStr(dataEntry.getHexValue()));
+			byte[] dataEntryHex = decodeHexStr(dataEntry.getHexValue());
+			dataHexStream.write(dataEntryHex);
+			block.addToOHDRMapTemplate(dataEntryHex.length, dataEntry.getOhdrUnkRemainder());
 		} // Save common or unknown DATA info
 		
 		switch(sbinJson.getSBinType()) {
@@ -527,6 +592,9 @@ public class SBin {
 			break;
 		case CAREER:
 			prepareCareerDataForSBinBlock(dataHexStream, sbinJson);
+			break;
+		case ACHIEVEMENTS:
+			dataHexStream.write(prepareAchievementDataForSBinBlock(block, sbinJson));
 			break;
 		default: break;
 		}
@@ -594,6 +662,67 @@ public class SBin {
 		}
 		dataHexStream.write(careerData1HexStream.toByteArray());
 		dataHexStream.write(careerData2HexStream.toByteArray());
+	}
+	
+	private byte[] prepareAchievementDataForSBinBlock(SBinBlockObj block, SBinJson sbinJson) throws IOException {
+		ByteArrayOutputStream achievementDataHexStream = new ByteArrayOutputStream();
+		int orderId = sbinJson.getDataElements().size();
+		
+		orderId++; // Skip map entry
+		SBinStructureEntryHex achiMap = new SBinStructureEntryHex();
+		achiMap.setHeader(intToByteArrayLE(0xF, 0x4));
+		achiMap.setSize(intToByteArrayLE(sbinJson.getAchievementArray().size(), 0x4));
+		
+		ByteArrayOutputStream achiCollectionHexStream = new ByteArrayOutputStream();
+		List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
+		for (SBinAchievementEntry achievement : sbinJson.getAchievementArray()) {
+			achiMap.addToDataIds(intToByteArrayLE(orderId, 0x4)); // Add achievement to map
+			orderId++;
+			
+			SBinAchievementEntryHex achiHex = new SBinAchievementEntryHex();
+			achiHex.setOhdrUnkRemainder(achievement.getOhdrUnkRemainder());
+			achiHex.setName(shortToBytes((short)achievement.getNameCHDRIdRef()));
+			achiHex.setDesc(shortToBytes((short)achievement.getDescCHDRIdRef()));
+			achiHex.setPoints(intToByteArrayLE(achievement.getPointsInt(), 0x4));
+			achiHex.setAutologAwardId(shortToBytes((short)achievement.getAutologAwardIdCHDRIdRef()));
+			achiHex.setCategoryId(intToByteArrayLE(achievement.getCategoryId(), 0x4));
+			achiHex.setMetricId(intToByteArrayLE(achievement.getMetricId(), 0x4));
+			achiHex.setMetricTarget(intToByteArrayLE(achievement.getMetricTargetInt(), 0x4));
+			achiHex.setImageName(shortToBytes((short)achievement.getImageNameCHDRIdRef()));
+			achiHex.setImageText(shortToBytes((short)achievement.getImageTextCHDRIdRef()));
+			achiHex.setOrderId(shortToBytes((short)orderId));
+			
+			SBinStructureEntryHex structure = new SBinStructureEntryHex();
+			structure.setHeader(intToByteArrayLE(0xF, 0x4));
+			structure.setSize(intToByteArrayLE(achievement.getMetricMilestones().size(), 0x4));
+			
+			for (int i = 0; i < achievement.getMetricMilestones().size(); i++) {
+				structure.addToDataIds(intToByteArrayLE(orderId + i + 1, 0x4));
+			} // MetricMilestones map
+			achiHex.setMetricMilestonesMap(structure);
+			orderId++;
+			
+			for (Integer milestone : achievement.getMetricMilestones()) {
+				SBinAchievementMilestoneEntryHex milestoneEntry = new SBinAchievementMilestoneEntryHex();
+				milestoneEntry.setHeader(shortToBytes((short)0x4));
+				milestoneEntry.setIntValue(intToByteArrayLE(milestone, 0x4));
+				achiHex.addToMetricMilestones(milestoneEntry);
+				orderId++;
+			}
+			achiCollectionHexStream.write(achiHex.toByteArray());
+			ohdrMapTemplate.addAll(achiHex.ohdrMapTemplate());
+		}
+		// Achievement map comes before the achievement objects
+		achievementDataHexStream.write(achiMap.toByteArray());
+		achievementDataHexStream.write(achiCollectionHexStream.toByteArray());
+		
+		block.addToOHDRMapTemplate(achiMap.getByteSize(), 0);
+		block.getOHDRMapTemplate().addAll(ohdrMapTemplate);
+		subLast2BytesOHDR(block);
+		
+		byte[] finalAchievementsBytes = achievementDataHexStream.toByteArray();
+		// Cut the last 2 bytes like in original files, supposed to be empty padding
+		return Arrays.copyOfRange(finalAchievementsBytes, 0, finalAchievementsBytes.length - 2);
 	}
 
 	//
