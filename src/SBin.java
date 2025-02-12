@@ -332,6 +332,25 @@ public class SBin {
 		lastOHDREntry.setValue(lastOHDREntry.getValue() - 0xE);
 	}
 	
+	private String getCDATStringByShortCHDRId(byte[] bytes, int startIndex, int endIndex, List<SBinCDATEntry> cdatStrings) {
+		int hexCHDRId = twoLEByteArrayToInt(Arrays.copyOfRange(bytes, startIndex, endIndex));
+		return cdatStrings.get(hexCHDRId).getString();
+	}
+	
+	private byte[] processStringInCDAT(List<SBinCDATEntry> cdatList, String string) {
+		for (SBinCDATEntry cdatEntry : cdatList) {
+			if (cdatEntry.getString().contentEquals(string)) {
+				return decodeHexStr(cdatEntry.getChdrHexId());
+			}
+		}
+		byte[] newCHDRId = shortToBytes(cdatList.size());
+		SBinCDATEntry newEntry = new SBinCDATEntry();
+		newEntry.setString(string);
+		newEntry.setChdrHexId(hexToString(newCHDRId));
+		cdatList.add(newEntry);
+		return newCHDRId;
+	}
+	
 	//
 	// SBin unpack functions
 	//
@@ -375,7 +394,7 @@ public class SBin {
 			
 			SBinCDATEntry cdatEntry = new SBinCDATEntry();
 			cdatEntry.setString(new String(Arrays.copyOfRange(cdatBytes, cdatPos, cdatPos + cdatEntrySize), StandardCharsets.UTF_8));
-			cdatEntry.setChdrHexId(Integer.toHexString(hexId).toUpperCase());
+			cdatEntry.setChdrHexId(hexToString(shortToBytes(hexId)));
 			cdatStrings.add(cdatEntry);
 			hexId++;
 		}
@@ -487,6 +506,7 @@ public class SBin {
 		List<SBinAchievementEntry> achievementsArray = new ArrayList<>();
 		
 		List<byte[]> achievementsMap = readDATABlockObjectMap(dataBlock.getBlockElements().get(8));
+		int firstStringCHDRId = 0;
 		// First entry is a header, second is int size
 		for (byte[] dataId : achievementsMap) {
 			int dataIndex = byteArrayToInt(dataId);
@@ -494,15 +514,27 @@ public class SBin {
 			SBinAchievementEntry achievement = new SBinAchievementEntry();
 			
 			achievement.setOhdrUnkRemainder(sbinJson.getDataElements().get(dataIndex).getOhdrUnkRemainder());
-			achievement.setNameCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 2, 4)));
-			achievement.setDescCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 4, 6)));
-			achievement.setPointsInt(byteArrayToInt(Arrays.copyOfRange(achiHex, 6, 10)));
-			achievement.setAutologAwardIdCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 10, 12)));
-			achievement.setCategoryId(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 14, 16)));
-			achievement.setMetricId(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 18, 20)));
-			achievement.setMetricTargetInt(byteArrayToInt(Arrays.copyOfRange(achiHex, 22, 26)));
-			achievement.setImageNameCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 26, 28)));
-			achievement.setImageTextCHDRIdRef(twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 28, 30)));
+			if (firstStringCHDRId == 0) {
+				firstStringCHDRId = twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 2, 4));
+			}
+			achievement.setName(
+					getCDATStringByShortCHDRId(achiHex, 2, 4, sbinJson.getCDATStrings()));
+			achievement.setDesc(
+					getCDATStringByShortCHDRId(achiHex, 4, 6, sbinJson.getCDATStrings()));
+			achievement.setPointsInt(
+					byteArrayToInt(Arrays.copyOfRange(achiHex, 6, 10)));
+			achievement.setAutologAwardId(
+					getCDATStringByShortCHDRId(achiHex, 10, 12, sbinJson.getCDATStrings()));
+			achievement.setCategoryId(
+					twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 14, 16)));
+			achievement.setMetricId(
+					twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 18, 20)));
+			achievement.setMetricTargetInt(
+					byteArrayToInt(Arrays.copyOfRange(achiHex, 22, 26)));
+			achievement.setImageName(
+					getCDATStringByShortCHDRId(achiHex, 26, 28, sbinJson.getCDATStrings()));
+			achievement.setImageText(
+					getCDATStringByShortCHDRId(achiHex, 28, 30, sbinJson.getCDATStrings()));
 			
 			byte[] metricMilestonesMap = dataBlock.getBlockElements().get(dataIndex + 1);
 			List<Integer> metricMilestones = new ArrayList<>();
@@ -517,6 +549,8 @@ public class SBin {
 		sbinJson.setAchievementArray(achievementsArray);
 		
 		sbinJson.setDataElements(sbinJson.getDataElements().subList(0, 8));
+		// Keep only structure-related strings in CDAT output
+		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, firstStringCHDRId));
 	}
 	
 	private void primitiveExtractDDS(SBinJson sbinJson, byte[] imageHex) throws IOException {
@@ -681,15 +715,15 @@ public class SBin {
 			
 			SBinAchievementEntryHex achiHex = new SBinAchievementEntryHex();
 			achiHex.setOhdrUnkRemainder(achievement.getOhdrUnkRemainder());
-			achiHex.setName(shortToBytes((short)achievement.getNameCHDRIdRef()));
-			achiHex.setDesc(shortToBytes((short)achievement.getDescCHDRIdRef()));
+			achiHex.setName(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getName()));
+			achiHex.setDesc(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getDesc()));
 			achiHex.setPoints(intToByteArrayLE(achievement.getPointsInt(), 0x4));
-			achiHex.setAutologAwardId(shortToBytes((short)achievement.getAutologAwardIdCHDRIdRef()));
+			achiHex.setAutologAwardId(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getAutologAwardId()));
 			achiHex.setCategoryId(intToByteArrayLE(achievement.getCategoryId(), 0x4));
 			achiHex.setMetricId(intToByteArrayLE(achievement.getMetricId(), 0x4));
 			achiHex.setMetricTarget(intToByteArrayLE(achievement.getMetricTargetInt(), 0x4));
-			achiHex.setImageName(shortToBytes((short)achievement.getImageNameCHDRIdRef()));
-			achiHex.setImageText(shortToBytes((short)achievement.getImageTextCHDRIdRef()));
+			achiHex.setImageName(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getImageName()));
+			achiHex.setImageText(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getImageText()));
 			achiHex.setOrderId(shortToBytes((short)orderId));
 			
 			SBinStructureEntryHex structure = new SBinStructureEntryHex();

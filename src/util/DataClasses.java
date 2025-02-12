@@ -620,7 +620,7 @@ public final class DataClasses {
 	
 	public static class SBinCDATEntry {
 		@SerializedName("CHDRHexId")
-		private String chdrHexId; // Only for info
+		private String chdrHexId;
 		@SerializedName("String")
 		private String string;
 		
@@ -729,24 +729,24 @@ public final class DataClasses {
 	public static class SBinAchievementEntry {
 		@SerializedName("OHDRUnkRemainder")
 		private int ohdrUnkRemainder = 0;
-		@SerializedName("Name_CHDRIdRef")
-		private int nameCHDRIdRef;
-		@SerializedName("Desc_CHDRIdRef")
-		private int descCHDRIdRef;
+		@SerializedName("Name")
+		private String name;
+		@SerializedName("Desc")
+		private String desc;
 		@SerializedName("Points_Int")
 		private int pointsInt;
-		@SerializedName("AutologAwardId_CHDRIdRef")
-		private int autologAwardIdCHDRIdRef;
+		@SerializedName("AutologAwardId")
+		private String autologAwardId;
 		@SerializedName("CategoryId_Int")
 		private int categoryId;
 		@SerializedName("MetricId_Int")
 		private int metricId;
 		@SerializedName("MetricTarget_Int")
 		private int metricTargetInt;
-		@SerializedName("ImageName_CHDRIdRef")
-		private int imageNameCHDRIdRef;
-		@SerializedName("ImageText_CHDRIdRef")
-		private int imageTextCHDRIdRef;
+		@SerializedName("ImageName")
+		private String imageName;
+		@SerializedName("ImageText")
+		private String imageText;
 		@SerializedName("MetricMilestones")
 		private List<Integer> metricMilestones;
 		
@@ -757,18 +757,18 @@ public final class DataClasses {
 			this.ohdrUnkRemainder = ohdrUnkRemainder;
 		}
 		
-		public int getNameCHDRIdRef() {
-			return nameCHDRIdRef;
+		public String getName() {
+			return name;
 		}
-		public void setNameCHDRIdRef(int nameCHDRIdRef) {
-			this.nameCHDRIdRef = nameCHDRIdRef;
+		public void setName(String name) {
+			this.name = name;
 		}
 		
-		public int getDescCHDRIdRef() {
-			return descCHDRIdRef;
+		public String getDesc() {
+			return desc;
 		}
-		public void setDescCHDRIdRef(int descCHDRIdRef) {
-			this.descCHDRIdRef = descCHDRIdRef;
+		public void setDesc(String desc) {
+			this.desc = desc;
 		}
 		
 		public int getPointsInt() {
@@ -778,11 +778,11 @@ public final class DataClasses {
 			this.pointsInt = pointsInt;
 		}
 		
-		public int getAutologAwardIdCHDRIdRef() {
-			return autologAwardIdCHDRIdRef;
+		public String getAutologAwardId() {
+			return autologAwardId;
 		}
-		public void setAutologAwardIdCHDRIdRef(int autologAwardIdCHDRIdRef) {
-			this.autologAwardIdCHDRIdRef = autologAwardIdCHDRIdRef;
+		public void setAutologAwardId(String autologAwardId) {
+			this.autologAwardId = autologAwardId;
 		}
 		
 		public int getCategoryId() {
@@ -806,18 +806,18 @@ public final class DataClasses {
 			this.metricTargetInt = metricTargetInt;
 		}
 		
-		public int getImageNameCHDRIdRef() {
-			return imageNameCHDRIdRef;
+		public String getImageName() {
+			return imageName;
 		}
-		public void setImageNameCHDRIdRef(int imageNameCHDRIdRef) {
-			this.imageNameCHDRIdRef = imageNameCHDRIdRef;
+		public void setImageName(String imageName) {
+			this.imageName = imageName;
 		}
 		
-		public int getImageTextCHDRIdRef() {
-			return imageTextCHDRIdRef;
+		public String getImageText() {
+			return imageText;
 		}
-		public void setImageTextCHDRIdRef(int imageTextCHDRIdRef) {
-			this.imageTextCHDRIdRef = imageTextCHDRIdRef;
+		public void setImageText(String imageText) {
+			this.imageText = imageText;
 		}
 		
 		public List<Integer> getMetricMilestones() {
