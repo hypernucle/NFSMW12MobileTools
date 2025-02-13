@@ -105,6 +105,9 @@ public class SBin {
 		case ACHIEVEMENTS:
 			unpackAchievementsData(sbinJson, dataBlock);
 			break;
+		case PLAYLISTS:
+			unpackPlaylistsData(sbinJson, dataBlock);
+			break;
 		case TEXTURE:
 			// BULK (Partial info)
 			SBinBlockObj bulkBlock = processSBinBlock(sbinData, BULK_HEADER, BARG_HEADER);
@@ -536,9 +539,9 @@ public class SBin {
 			achievement.setImageText(
 					getCDATStringByShortCHDRId(achiHex, 28, 30, sbinJson.getCDATStrings()));
 			
-			byte[] metricMilestonesMap = dataBlock.getBlockElements().get(dataIndex + 1);
 			List<Integer> metricMilestones = new ArrayList<>();
-			List<byte[]> metricMilestonesEntries = readDATABlockObjectMap(metricMilestonesMap);
+			List<byte[]> metricMilestonesEntries = readDATABlockObjectMap(
+					dataBlock.getBlockElements().get(dataIndex + 1));
 			for (byte[] milestoneDataId : metricMilestonesEntries) {
 				byte[] milestoneHexData = dataBlock.getBlockElements().get(byteArrayToInt(milestoneDataId));
 				metricMilestones.add(byteArrayToInt(Arrays.copyOfRange(milestoneHexData, 2, 6)));
@@ -551,6 +554,46 @@ public class SBin {
 		sbinJson.setDataElements(sbinJson.getDataElements().subList(0, 8));
 		// Keep only structure-related strings in CDAT output
 		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, firstStringCHDRId));
+	}
+	
+	private void unpackPlaylistsData(SBinJson sbinJson, SBinBlockObj dataBlock) {
+		List<byte[]> playlistsMap = readDATABlockObjectMap(dataBlock.getBlockElements().get(1));
+		List<SBinPlaylistObj> playlistsJson = new ArrayList<>();
+		
+		for (byte[] playlistDescPos : playlistsMap) {
+			int dataIndex = byteArrayToInt(playlistDescPos);
+			byte[] playlistDescHex = dataBlock.getBlockElements().get(dataIndex);
+			
+			SBinPlaylistObj playlist = new SBinPlaylistObj();
+			playlist.setOhdrDescRemainder(sbinJson.getDataElements().get(dataIndex).getOhdrUnkRemainder());
+			playlist.setName(
+					getCDATStringByShortCHDRId(playlistDescHex, 12, 14, sbinJson.getCDATStrings()));
+			
+			List<byte[]> tracks = readDATABlockObjectMap(
+					dataBlock.getBlockElements().get(dataIndex + 1));
+			playlist.setOhdrStruRemainder(sbinJson.getDataElements().get(dataIndex + 1).getOhdrUnkRemainder());
+			for (byte[] trackId : tracks) {
+				int trackIndex = byteArrayToInt(trackId);
+				byte[] trackHex = dataBlock.getBlockElements().get(trackIndex);
+				SBinPlaylistTrackObj trackObj = new SBinPlaylistTrackObj();
+				
+				trackObj.setOhdrUnkRemainder(sbinJson.getDataElements().get(trackIndex).getOhdrUnkRemainder());
+				trackObj.setFilePath(
+						getCDATStringByShortCHDRId(trackHex, 12, 14, sbinJson.getCDATStrings()));
+				trackObj.setArtist(
+						getCDATStringByShortCHDRId(trackHex, 22, 24, sbinJson.getCDATStrings()));
+				trackObj.setTitle(
+						getCDATStringByShortCHDRId(trackHex, 32, 34, sbinJson.getCDATStrings()));
+				playlist.addToPlaylist(trackObj);
+			}
+			playlistsJson.add(playlist);
+		}
+		sbinJson.setPlaylistsArray(playlistsJson);
+		
+		sbinJson.setDataElements(sbinJson.getDataElements().subList(0, 1));
+		// Keep only structure-related strings in CDAT output. 
+		// This time string ordering is unusual, so we proceed with hard-coded position
+		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, 13));
 	}
 	
 	private void primitiveExtractDDS(SBinJson sbinJson, byte[] imageHex) throws IOException {
