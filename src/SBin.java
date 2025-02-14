@@ -45,6 +45,12 @@ public class SBin {
 	private static final int CAREER_OHDR_COMMONBYTES = 0x2C;
 	private static final int CAREER_OHDR_GARAGECARS_BASEVALUE = 0x430;
 	private static final byte[] CAREER_DATA_P2_SHORTBYTES = decodeHexStr("0300");
+	//
+	private static final byte[] PLAYLISTS_DATA_DESC_UNK1 = decodeHexStr("1C0002000D000C000000");
+	private static final byte[] PLAYLISTS_DATA_DESC_UNK2 = decodeHexStr("04000F00180000000000");
+	private static final byte[] PLAYLISTS_DATA_TRACK_UNK1 = decodeHexStr("220005000D000C000000");
+	private static final byte[] PLAYLISTS_DATA_TRACK_UNK2 = decodeHexStr("07000D0016000000");
+	private static final byte[] PLAYLISTS_DATA_TRACK_UNK3 = decodeHexStr("08000D0020000000");
 	
 	private static int curPos = 0x0;
 	
@@ -673,6 +679,9 @@ public class SBin {
 		case ACHIEVEMENTS:
 			dataHexStream.write(prepareAchievementDataForSBinBlock(block, sbinJson));
 			break;
+		case PLAYLISTS:
+			dataHexStream.write(preparePlaylistsDataForSBinBlock(block, sbinJson));
+			break;
 		default: break;
 		}
 		block.setBlockBytes(dataHexStream.toByteArray());
@@ -800,6 +809,68 @@ public class SBin {
 		byte[] finalAchievementsBytes = achievementDataHexStream.toByteArray();
 		// Cut the last 2 bytes like in original files, supposed to be empty padding
 		return Arrays.copyOfRange(finalAchievementsBytes, 0, finalAchievementsBytes.length - 2);
+	}
+	
+	private byte[] preparePlaylistsDataForSBinBlock(SBinBlockObj block, SBinJson sbinJson) throws IOException {
+		ByteArrayOutputStream playlistsDataHexStream = new ByteArrayOutputStream();
+		int orderId = sbinJson.getDataElements().size();
+		
+		orderId++; // Skip map entry
+		SBinStructureEntryHex playlistsMap = new SBinStructureEntryHex();
+		playlistsMap.setHeader(intToByteArrayLE(0xF, 0x4));
+		playlistsMap.setSize(intToByteArrayLE(sbinJson.getPlaylistsArray().size(), 0x4));
+		playlistsMap.setPadding(new byte[0]);
+		
+		ByteArrayOutputStream playlistCollectionHexStream = new ByteArrayOutputStream();
+		List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
+		for (SBinPlaylistObj playlist : sbinJson.getPlaylistsArray()) {
+			playlistsMap.addToDataIds(intToByteArrayLE(orderId, 0x4)); // Add playlist to map
+			orderId++;
+			
+			SBinPlaylistEntryHex playlistHex = new SBinPlaylistEntryHex();
+			playlistHex.setOhdrDescRemainder(playlist.getOhdrDescRemainder());
+			playlistHex.setOhdrStruRemainder(playlist.getOhdrStruRemainder());
+			playlistHex.setHeader(shortToBytes((short)0x2));
+			playlistHex.setUnkHex1(PLAYLISTS_DATA_DESC_UNK1);
+			playlistHex.setName(processStringInCDAT(sbinJson.getCDATStrings(), playlist.getName()));
+			playlistHex.setUnkHex2(PLAYLISTS_DATA_DESC_UNK2);
+			playlistHex.setOrderId(shortToBytes((short)orderId));
+			
+			SBinStructureEntryHex tracksMap = new SBinStructureEntryHex();
+			tracksMap.setHeader(intToByteArrayLE(0xF, 0x4));
+			tracksMap.setSize(intToByteArrayLE(playlist.getPlaylist().size(), 0x4));
+			tracksMap.setPadding(new byte[0]);
+			
+			for (int i = 0; i < playlist.getPlaylist().size(); i++) {
+				tracksMap.addToDataIds(intToByteArrayLE(orderId + i + 1, 0x4));
+			} 
+			playlistHex.setTracksMap(tracksMap);
+			orderId++;
+			
+			for (SBinPlaylistTrackObj track : playlist.getPlaylist()) {
+				SBinPlaylistTrackHex trackEntry = new SBinPlaylistTrackHex();
+				trackEntry.setOhdrUnkRemainder(track.getOhdrUnkRemainder());
+				trackEntry.setHeader(shortToBytes((short)0x3));
+				trackEntry.setUnkHex1(PLAYLISTS_DATA_TRACK_UNK1);
+				trackEntry.setFilePath(processStringInCDAT(sbinJson.getCDATStrings(), track.getFilePath()));
+				trackEntry.setUnkHex2(PLAYLISTS_DATA_TRACK_UNK2);
+				trackEntry.setArtist(processStringInCDAT(sbinJson.getCDATStrings(), track.getArtist()));
+				trackEntry.setUnkHex3(PLAYLISTS_DATA_TRACK_UNK3);
+				trackEntry.setTitle(processStringInCDAT(sbinJson.getCDATStrings(), track.getTitle()));
+				playlistHex.addToPlaylistTracks(trackEntry);
+				orderId++;
+			}
+			
+			playlistCollectionHexStream.write(playlistHex.toByteArray());
+			ohdrMapTemplate.addAll(playlistHex.ohdrMapTemplate());
+		}
+		// Playlists map comes before the Playlists objects
+		playlistsDataHexStream.write(playlistsMap.toByteArray());
+		playlistsDataHexStream.write(playlistCollectionHexStream.toByteArray());
+
+		block.addToOHDRMapTemplate(playlistsMap.getByteSize(), 1);
+		block.getOHDRMapTemplate().addAll(ohdrMapTemplate);
+		return playlistsDataHexStream.toByteArray();
 	}
 
 	//
