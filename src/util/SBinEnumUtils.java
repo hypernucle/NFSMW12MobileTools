@@ -1,5 +1,6 @@
 package util;
 
+import util.DataClasses.SBinDataField;
 import util.DataClasses.SBinJson;
 
 public class SBinEnumUtils {
@@ -8,8 +9,7 @@ public class SBinEnumUtils {
 	// SBinFieldType
 	//
 	
-	// TODO Sizes is different for some .sb files, calc it from field data
-	public static int getFieldSize(SBinFieldType type) {
+	public static int getFieldStandardSize(SBinFieldType type) {
 		int size = 0x0;
 		switch(type) {
 		case INT8:
@@ -26,8 +26,12 @@ public class SBinEnumUtils {
 		return size;
 	}
 	
-	public static String formatFieldValueUnpack(SBinFieldType type, byte[] valueHex, SBinJson sbinJson) {
+	public static String formatFieldValueUnpack(SBinFieldType type, SBinDataField dataField, int fieldRealSize, byte[] valueHex, SBinJson sbinJson) {
 		String strValue;
+		if (getFieldStandardSize(type) != fieldRealSize) {
+			dataField.setForcedHexValue(true);
+			return getDefaultHEXString(valueHex);
+		}
 		switch(type) {
 		case INT32: case INT32_0X12: case INT32_0X16:
 			strValue = String.valueOf(HEXUtils.byteArrayToInt(valueHex));
@@ -49,9 +53,13 @@ public class SBinEnumUtils {
 		case INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			// INT8: Primarily used for HEX colors, left as it is
 			// DATA_ID: simpler to provide HEX code and compare/find with other DATA info
-			strValue = HEXUtils.hexToString(valueHex).toUpperCase();
+			strValue = getDefaultHEXString(valueHex);
 			break;
 		}
 		return strValue;
+	}
+	
+	private static String getDefaultHEXString(byte[] valueHex) {
+		return HEXUtils.hexToString(valueHex);
 	}
 }

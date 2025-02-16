@@ -400,6 +400,8 @@ public final class DataClasses {
 		private int startOffset;
 		@SerializedName("FieldSize")
 		private int fieldSize = 0;
+		@SerializedName("DynamicSize")
+		private boolean dynamicSize = false;
 		@SerializedName("UnkOrderId")
 		private int unkOrderId = 0;
 		
@@ -431,6 +433,13 @@ public final class DataClasses {
 		}
 		public void setFieldSize(int fieldSize) {
 			this.fieldSize = fieldSize;
+		}
+		
+		public boolean isDynamicSize() {
+			return dynamicSize;
+		}
+		public void setDynamicSize(boolean dynamicSize) {
+			this.dynamicSize = dynamicSize;
 		}
 		
 		public int getUnkOrderId() {
@@ -510,6 +519,8 @@ public final class DataClasses {
 		private String name;
 		@SerializedName("Type")
 		private String type;
+		@SerializedName("ForcedHexValue")
+		private boolean forcedHexValue;
 		@SerializedName("Value")
 		private String value;
 		
@@ -525,6 +536,13 @@ public final class DataClasses {
 		}
 		public void setType(String type) {
 			this.type = type;
+		}
+		
+		public boolean isForcedHexValue() {
+			return forcedHexValue;
+		}
+		public void setForcedHexValue(boolean forcedHexValue) {
+			this.forcedHexValue = forcedHexValue;
 		}
 		
 		public String getValue() {
