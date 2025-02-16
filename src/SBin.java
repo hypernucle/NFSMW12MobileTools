@@ -2,8 +2,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,12 +17,15 @@ import com.google.gson.reflect.TypeToken;
 import util.FNV1;
 import util.SBinType;
 import util.DataClasses.*;
+import util.HEXClasses.*;
+import util.HEXUtils;
+import util.SBinEnumUtils;
+import util.SBinFieldType;
 
 public class SBin {
 	
 	Gson gson = new Gson();
 	
-	private static final byte[] HEX_ARRAY = "0123456789ABCDEF".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] SBIN_HEADER = "SBIN".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] ENUM_HEADER = "ENUM".getBytes(StandardCharsets.UTF_8);
 	private static final byte[] STRU_HEADER = "STRU".getBytes(StandardCharsets.UTF_8);
@@ -44,13 +45,13 @@ public class SBin {
 	private static final int CAREER_DATA_COMMONBYTES = 0x80;
 	private static final int CAREER_OHDR_COMMONBYTES = 0x2C;
 	private static final int CAREER_OHDR_GARAGECARS_BASEVALUE = 0x430;
-	private static final byte[] CAREER_DATA_P2_SHORTBYTES = decodeHexStr("0300");
+	private static final byte[] CAREER_DATA_P2_SHORTBYTES = HEXUtils.decodeHexStr("0300");
 	//
-	private static final byte[] PLAYLISTS_DATA_DESC_UNK1 = decodeHexStr("1C0002000D000C000000");
-	private static final byte[] PLAYLISTS_DATA_DESC_UNK2 = decodeHexStr("04000F00180000000000");
-	private static final byte[] PLAYLISTS_DATA_TRACK_UNK1 = decodeHexStr("220005000D000C000000");
-	private static final byte[] PLAYLISTS_DATA_TRACK_UNK2 = decodeHexStr("07000D0016000000");
-	private static final byte[] PLAYLISTS_DATA_TRACK_UNK3 = decodeHexStr("08000D0020000000");
+	private static final byte[] PLAYLISTS_DATA_DESC_UNK1 = HEXUtils.decodeHexStr("1C0002000D000C000000");
+	private static final byte[] PLAYLISTS_DATA_DESC_UNK2 = HEXUtils.decodeHexStr("04000F00180000000000");
+	private static final byte[] PLAYLISTS_DATA_TRACK_UNK1 = HEXUtils.decodeHexStr("220005000D000C000000");
+	private static final byte[] PLAYLISTS_DATA_TRACK_UNK2 = HEXUtils.decodeHexStr("07000D0016000000");
+	private static final byte[] PLAYLISTS_DATA_TRACK_UNK3 = HEXUtils.decodeHexStr("08000D0020000000");
 	
 	private static int curPos = 0x0;
 	
@@ -74,33 +75,36 @@ public class SBin {
 
 		// ENUM (Not enough info)
 		SBinBlockObj enumBlock = processSBinBlock(sbinData, ENUM_HEADER, STRU_HEADER);		
-		sbinJson.setENUMHexStr(hexToString(enumBlock.getBlockBytes()).toUpperCase());
+		sbinJson.setENUMHexStr(HEXUtils.hexToString(enumBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setENUMHexEmptyBytesCount(Long.valueOf(enumBlock.getBlockEmptyBytesCount()));
-		// STRU (Not enough info)
+		// STRU: object structures of DATA block
 		SBinBlockObj struBlock = processSBinBlock(sbinData, STRU_HEADER, FIEL_HEADER);
-		sbinJson.setSTRUHexStr(hexToString(struBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setSTRUHexEmptyBytesCount(Long.valueOf(struBlock.getBlockEmptyBytesCount()));
-		// FIEL (Not enough info)
+		// FIEL: info fields for Structs
 		SBinBlockObj fielBlock = processSBinBlock(sbinData, FIEL_HEADER, OHDR_HEADER);	
-		sbinJson.setFIELHexStr(hexToString(fielBlock.getBlockBytes()).toUpperCase());
 		sbinJson.setFIELHexEmptyBytesCount(Long.valueOf(fielBlock.getBlockEmptyBytesCount()));
+		//
+		if (sbinJson.getSBinType() != SBinType.COMMON) {
+			sbinJson.setSTRUHexStr(HEXUtils.hexToString(struBlock.getBlockBytes()).toUpperCase());
+			sbinJson.setFIELHexStr(HEXUtils.hexToString(fielBlock.getBlockBytes()).toUpperCase());
+		}
 		// OHDR: map of DATA block
 		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, OHDR_HEADER, DATA_HEADER);		
 		saveOHDRBlockData(sbinJson, ohdrBlock);
 		// DATA: various objects info
 		SBinBlockObj dataBlock = processSBinBlock(sbinData, DATA_HEADER, CHDR_HEADER);	
-		parseDATABlock(sbinJson, ohdrBlock, dataBlock);
 		sbinJson.setDATAHexEmptyBytesCount(Long.valueOf(dataBlock.getBlockEmptyBytesCount()));
 		// CHDR: map of CDAT block
 		SBinBlockObj chdrBlock = processSBinBlock(sbinData, CHDR_HEADER, CDAT_HEADER);
 		sbinJson.setCHDRHexEmptyBytesCount(Long.valueOf(chdrBlock.getBlockEmptyBytesCount()));
-		
 		// CDAT: field names & string variables
 		SBinBlockObj cdatBlock = processSBinBlock(sbinData, CDAT_HEADER, 
 				sbinJson.getSBinType() == SBinType.TEXTURE ? BULK_HEADER : null);
 		sbinJson.setCDATHexEmptyBytesCount(Long.valueOf(cdatBlock.getBlockEmptyBytesCount()));
 		sbinJson.setCDATStrings(prepareCDATStrings(chdrBlock.getBlockBytes(), cdatBlock.getBlockBytes()));
 		
+		readStructsAndFields(sbinJson, struBlock, fielBlock);
+		parseDATABlock(sbinJson, ohdrBlock, dataBlock);
 		switch(sbinJson.getSBinType()) {
 		case STRINGDATA:
 			unpackStringData(sbinJson, dataBlock);
@@ -117,7 +121,7 @@ public class SBin {
 		case TEXTURE:
 			// BULK (Partial info)
 			SBinBlockObj bulkBlock = processSBinBlock(sbinData, BULK_HEADER, BARG_HEADER);
-			sbinJson.setBULKHexStr(hexToString(bulkBlock.getBlockBytes()).toUpperCase());
+			sbinJson.setBULKHexStr(HEXUtils.hexToString(bulkBlock.getBlockBytes()).toUpperCase());
 			sbinJson.setBULKHexEmptyBytesCount(Long.valueOf(bulkBlock.getBlockEmptyBytesCount()));
 			// BARG (Image data)
 			SBinBlockObj bargBlock = processSBinBlock(sbinData, BARG_HEADER, null);
@@ -208,8 +212,8 @@ public class SBin {
 		}
 
 		int hexHash = FNV1.hash32(filePart);
-		String output = Integer.toHexString(hexRev(hexHash)).toUpperCase();
-		String length = Integer.toHexString(hexRev(filePart.length)).toUpperCase();
+		String output = Integer.toHexString(HEXUtils.hexRev(hexHash)).toUpperCase();
+		String length = Integer.toHexString(HEXUtils.hexRev(filePart.length)).toUpperCase();
 		System.out.println("FNV1 Hash: " + output);
 		System.out.println("Block Length: " + length);
 	}
@@ -221,37 +225,37 @@ public class SBin {
 		ohdrStream.write(ohdrStartBytes);
 		int addition = extraValueMode != 0 ? 0x20 : 0x0;
 		
-		writeBytesWithAddition(ohdrStream, 0x310, addition);
-		writeBytesWithAddition(ohdrStream, 0x4E2, addition);
+		HEXUtils.writeBytesWithAddition(ohdrStream, 0x310, addition);
+		HEXUtils.writeBytesWithAddition(ohdrStream, 0x4E2, addition);
 		
 		addition += 0x20 * swatchCount;
 		int baseValue = 0x530;
 		for (int i = 0; i < swatchCount; i++) {
 			if (i > 0) {addition += 0x40;}
-			writeBytesWithAddition(ohdrStream, baseValue, addition);
+			HEXUtils.writeBytesWithAddition(ohdrStream, baseValue, addition);
 			addition += 0xE0;
-			writeBytesWithAddition(ohdrStream, baseValue, addition);
+			HEXUtils.writeBytesWithAddition(ohdrStream, baseValue, addition);
 			addition += 0x40;
-			writeBytesWithAddition(ohdrStream, baseValue, addition);
+			HEXUtils.writeBytesWithAddition(ohdrStream, baseValue, addition);
 		}
 		
 		addition += 0x32;
-		writeBytesWithAddition(ohdrStream, baseValue, addition);
+		HEXUtils.writeBytesWithAddition(ohdrStream, baseValue, addition);
 		//
 		addition += 0x14E;
-		writeBytesWithAddition(ohdrStream, baseValue, addition);
+		HEXUtils.writeBytesWithAddition(ohdrStream, baseValue, addition);
 		//
 		for (int i = 0; i < 8; i++) {
 			addition += 0xA0;
-			writeBytesWithAddition(ohdrStream, baseValue, addition);
+			HEXUtils.writeBytesWithAddition(ohdrStream, baseValue, addition);
 		}
 		if (extraValueMode != 0) {
 			addition += 0x40;
 			if (extraValueMode == 2) {addition += 0x20;}
-			writeBytesWithAddition(ohdrStream, baseValue, addition);
+			HEXUtils.writeBytesWithAddition(ohdrStream, baseValue, addition);
 		}
 		System.out.println("OHDR CarDesc block for " + swatchCount + " swatches, extraValueMode " + extraValueMode + ": "
-				+ hexToString(ohdrStream.toByteArray()).toUpperCase());
+				+ HEXUtils.hexToString(ohdrStream.toByteArray()).toUpperCase());
 	}
 
 	//
@@ -263,10 +267,15 @@ public class SBin {
 		block.setHeader(header);
 		changeCurPos(0x4); // Skip header
 		block.setBlockSize(getBytesFromCurPos(sbinData, 0x4));
-		block.setBlockSizeInt(byteArrayToInt(block.getBlockSize()));
+		block.setBlockSizeInt(HEXUtils.byteArrayToInt(block.getBlockSize()));
 		changeCurPos(0x8); // Skip size + hash
 		if (block.getBlockSizeInt() != 0x0) {
 			block.setBlockBytes(getBytesFromCurPos(sbinData, block.getBlockSizeInt()));
+			if (Arrays.equals(header, STRU_HEADER)) {
+				block.setBlockElements(HEXUtils.splitByteArray(block.getBlockBytes(), 0x6));
+			} else if (Arrays.equals(header, FIEL_HEADER)) {
+				block.setBlockElements(HEXUtils.splitByteArray(block.getBlockBytes(), 0x8));
+			}
 			changeCurPos(block.getBlockSizeInt()); 
 		}
 
@@ -276,17 +285,17 @@ public class SBin {
 			block.setBlockEmptyBytesCount(block.getBlockEmptyBytesCount() + 1);
 			fielHeaderCheck = getBytesFromCurPos(sbinData, 0x4);
 		}
-
+		
 		return block;
 	}
 
 	private SBinBlockObj createSBinBlock(String hexStr, byte[] header) {
 		SBinBlockObj block = new SBinBlockObj();
 		block.setHeader(header);
-		block.setBlockBytes(decodeHexStr(hexStr));
-		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
+		block.setBlockBytes(HEXUtils.decodeHexStr(hexStr));
+		block.setFnv1Hash(HEXUtils.intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
 		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
+			block.setBlockSize(HEXUtils.intToByteArrayLE(block.getBlockBytes().length, 0x4));
 		}
 		return block;
 	}
@@ -314,16 +323,16 @@ public class SBin {
 	}
 	
 	private void setSBinBlockAttributes(SBinBlockObj block) {
-		block.setFnv1Hash(intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
+		block.setFnv1Hash(HEXUtils.intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
 		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(intToByteArrayLE(block.getBlockBytes().length, 0x4));
+			block.setBlockSize(HEXUtils.intToByteArrayLE(block.getBlockBytes().length, 0x4));
 		}
 	}
 	
 	// Some DATA entries ends with short "00 00" instead of 4 bytes
 	private List<byte[]> readDATABlockObjectMap(byte[] map) {
 		List<byte[]> entries = new ArrayList<>();
-		int entriesCount = byteArrayToInt(Arrays.copyOfRange(map, 4, 8));
+		int entriesCount = HEXUtils.byteArrayToInt(Arrays.copyOfRange(map, 4, 8));
 		if (entriesCount != 0) {
 			byte[] mapEntries = Arrays.copyOfRange(map, 8, map.length);
 			
@@ -342,20 +351,20 @@ public class SBin {
 	}
 	
 	private String getCDATStringByShortCHDRId(byte[] bytes, int startIndex, int endIndex, List<SBinCDATEntry> cdatStrings) {
-		int hexCHDRId = twoLEByteArrayToInt(Arrays.copyOfRange(bytes, startIndex, endIndex));
+		int hexCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(bytes, startIndex, endIndex));
 		return cdatStrings.get(hexCHDRId).getString();
 	}
 	
 	private byte[] processStringInCDAT(List<SBinCDATEntry> cdatList, String string) {
 		for (SBinCDATEntry cdatEntry : cdatList) {
 			if (cdatEntry.getString().contentEquals(string)) {
-				return decodeHexStr(cdatEntry.getChdrHexId());
+				return HEXUtils.decodeHexStr(cdatEntry.getChdrHexId());
 			}
 		}
-		byte[] newCHDRId = shortToBytes(cdatList.size());
+		byte[] newCHDRId = HEXUtils.shortToBytes(cdatList.size());
 		SBinCDATEntry newEntry = new SBinCDATEntry();
 		newEntry.setString(string);
-		newEntry.setChdrHexId(hexToString(newCHDRId));
+		newEntry.setChdrHexId(HEXUtils.hexToString(newCHDRId));
 		cdatList.add(newEntry);
 		return newCHDRId;
 	}
@@ -364,10 +373,47 @@ public class SBin {
 	// SBin unpack functions
 	//
 	
+	private void readStructsAndFields(SBinJson sbinJson, SBinBlockObj struBlock, SBinBlockObj fielBlock) {
+		if (sbinJson.getSBinType() != SBinType.COMMON || struBlock.getBlockSizeInt() == 0
+				|| fielBlock.getBlockSizeInt() == 0) {return;}
+		
+		for (byte[] structBytes : struBlock.getBlockElements()) {
+			SBinStruct struct = new SBinStruct();
+			struct.setName(
+					getCDATStringByShortCHDRId(structBytes, 0, 2, sbinJson.getCDATStrings()));
+			
+			int firstFieldId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 2, 4));
+			int fieldsCount = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 4, 6));
+			for (int i = 0; i < fieldsCount; i++) {
+				byte[] fieldHex = fielBlock.getBlockElements().get(firstFieldId + i);
+				SBinField fieldObj = new SBinField();
+				fieldObj.setName(
+						getCDATStringByShortCHDRId(fieldHex, 0, 2, sbinJson.getCDATStrings()));
+				int type = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 2, 4));
+				
+				fieldObj.setFieldTypeEnum(SBinFieldType.valueOf(type));
+				String fieldEnumStr;
+				if (fieldObj.getFieldTypeEnum() == null) {
+					fieldEnumStr = "UNK_" + Integer.toHexString(type);
+					struct.setKnownTypes(false); // Do not parse DATA here - unknown entry size
+				} else {
+					fieldEnumStr = fieldObj.getFieldTypeEnum().toString();
+					fieldObj.setFieldSize(SBinEnumUtils.getFieldSize(fieldObj.getFieldTypeEnum()));
+				}
+				fieldObj.setType(fieldEnumStr);
+				fieldObj.setStartOffset(HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 4, 6)));
+				fieldObj.setUnkOrderId(HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 6, 8)));
+				struct.addToFields(fieldObj);
+			}
+			
+			sbinJson.addStruct(struct);
+		}
+	}
+	
 	private void parseDATABlock(SBinJson sbinJson, SBinBlockObj ohdrBlock, SBinBlockObj dataBlock) {
-		List<byte[]> ohdrPosDataBytes = splitByteArray(ohdrBlock.getBlockBytes(), 0x4);
+		List<byte[]> ohdrPosDataBytes = HEXUtils.splitByteArray(ohdrBlock.getBlockBytes(), 0x4);
 		ohdrPosDataBytes.remove(0); // First one is always 0x1
-		ohdrPosDataBytes.add(intToByteArrayLE(dataBlock.getBlockBytes().length * 0x8, 0x4)); // Create a fake last one, same as DATA size
+		ohdrPosDataBytes.add(HEXUtils.intToByteArrayLE(dataBlock.getBlockBytes().length * 0x8, 0x4)); // Create a fake last one, same as DATA size
 		List<SBinDataElement> sbinDataElements = new ArrayList<>();
 		List<byte[]> blockElements = new ArrayList<>();
 		
@@ -375,35 +421,64 @@ public class SBin {
 		int i = 0;
 		for (byte[] ohdrPos : ohdrPosDataBytes) {
 			SBinDataElement element = new SBinDataElement();
-			int elementOHDR = byteArrayToInt(ohdrPos);
+			int elementOHDR = HEXUtils.byteArrayToInt(ohdrPos);
 			int elementBegin = elementOHDR / 0x8;
 			
 			byte[] elementHex = Arrays.copyOfRange(dataBlock.getBlockBytes(), ohdrPrevValue, elementBegin);
-			element.setHexValue(hexToString(elementHex).toUpperCase());
-			element.setOrderId(i);
+			element.setHexValue(HEXUtils.hexToString(elementHex).toUpperCase());
+			element.setOrderHexId(HEXUtils.hexToString(HEXUtils.shortToBytes(i)));
 			element.setOhdrUnkRemainder(elementOHDR - (elementBegin * 0x8));
-			sbinDataElements.add(element);
-			blockElements.add(elementHex); // For internal use
-			
 			ohdrPrevValue = elementBegin;
 			i++;
+			
+			int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
+			if (!sbinJson.getStructs().isEmpty() && structId < sbinJson.getStructs().size()) {
+				// TODO Ignore map parsing at the moment
+				List<SBinDataField> fields = new ArrayList<>();
+				SBinStruct struct = sbinJson.getStructs().get(structId);
+				if (struct == null || !struct.isKnownTypes()) {continue;}
+				element.setStructName(struct.getName());
+				int fieldsTakenSize = 0;
+				for (SBinField field : struct.getFieldsArray()) {
+					SBinDataField dataField = new SBinDataField();
+					dataField.setName(field.getName());
+					dataField.setType(field.getType());
+					dataField.setValue(getDataFieldValue(field, elementHex, sbinJson));
+					fields.add(dataField);
+					fieldsTakenSize += field.getFieldSize();
+				}
+				if (fieldsTakenSize != elementHex.length) {
+					element.setExtraHexValue(HEXUtils.hexToString( // +2 for struct header
+							Arrays.copyOfRange(elementHex, fieldsTakenSize + 2, elementHex.length)));
+				}
+				element.setFields(fields);
+			}
+			sbinDataElements.add(element);
+			blockElements.add(elementHex); // For internal use
 		}
 		sbinJson.setDataElements(sbinDataElements);
 		dataBlock.setBlockElements(blockElements);
 	}
 	
+	private String getDataFieldValue(SBinField field, byte[] elementHex, SBinJson sbinJson) {
+		// First two bytes is taken by Struct ID, start byte goes after it
+		int startOffset = field.getStartOffset() + 2;
+		byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + field.getFieldSize());
+		return SBinEnumUtils.formatFieldValueUnpack(field.getFieldTypeEnum(), valueHex, sbinJson);
+	}
+	
 	private List<SBinCDATEntry> prepareCDATStrings(byte[] chdrBytes, byte[] cdatBytes) {
-		List<byte[]> chdrEntries = splitByteArray(chdrBytes, 0x8);
+		List<byte[]> chdrEntries = HEXUtils.splitByteArray(chdrBytes, 0x8);
 		List<SBinCDATEntry> cdatStrings = new ArrayList<>();
 		int hexId = 0x0;
 		for (byte[] chdrEntry : chdrEntries) {
-			int cdatPos = byteArrayToInt(Arrays.copyOfRange(chdrEntry, 0, 4));
-			int cdatEntrySize = byteArrayToInt(Arrays.copyOfRange(chdrEntry, 4, 8));
-//			System.out.println("### cdatPos: " + Integer.toHexString(cdatPos) + ", cdatSize: " + Integer.toHexString(cdatEntrySize));
+			int cdatPos = HEXUtils.byteArrayToInt(Arrays.copyOfRange(chdrEntry, 0, 4));
+			int cdatEntrySize = HEXUtils.byteArrayToInt(Arrays.copyOfRange(chdrEntry, 4, 8));
+			//System.out.println("### cdatPos: " + Integer.toHexString(cdatPos) + ", cdatSize: " + Integer.toHexString(cdatEntrySize));
 			
 			SBinCDATEntry cdatEntry = new SBinCDATEntry();
 			cdatEntry.setString(new String(Arrays.copyOfRange(cdatBytes, cdatPos, cdatPos + cdatEntrySize), StandardCharsets.UTF_8));
-			cdatEntry.setChdrHexId(hexToString(shortToBytes(hexId)));
+			cdatEntry.setChdrHexId(HEXUtils.hexToString(HEXUtils.shortToBytes(hexId)));
 			cdatStrings.add(cdatEntry);
 			hexId++;
 		}
@@ -417,7 +492,7 @@ public class SBin {
 		ByteArrayOutputStream stringsHexStream = new ByteArrayOutputStream();
 		List<byte[]> blockElements = new ArrayList<>();
 		// Some elements could be empty, like the first one. Then data bytes begins with 00 splitter byte
-		addCDATElementsToByteArraysList(sbinJson.getCDATStrings(), blockElements);
+		HEXUtils.addCDATElementsToByteArraysList(sbinJson.getCDATStrings(), blockElements);
 		
 		if (sbinJson.getSBinType() == SBinType.STRINGDATA) {
 			for (SBinStringDataEntry strDataEntry : sbinJson.getStrDataEntriesArray()) {
@@ -426,7 +501,7 @@ public class SBin {
 				blockElements.add(byteEntry);
 			}
 		} else if (sbinJson.getSBinType() == SBinType.CAREER) {
-			addElementsToByteArraysList(sbinJson.getCareerGarageCarsArray(), blockElements);
+			HEXUtils.addElementsToByteArraysList(sbinJson.getCareerGarageCarsArray(), blockElements);
 		}
 		
 		block.setBlockElements(blockElements); // Save it for CHDR block
@@ -444,7 +519,7 @@ public class SBin {
 		List<SBinStringDataEntry> strDataEntriesArray = new ArrayList<>();
 		
 		setCurPos(DATA_COMMONBYTES); // Skip common bytes on DATA
-		int stringDataEntriesCount = byteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x4));
+		int stringDataEntriesCount = HEXUtils.byteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x4));
 		changeCurPos(0x4);
 		byte[] stringDataBytes = getBytesFromCurPos(dataBlock.getBlockBytes(), stringDataEntriesCount * 8);
 		
@@ -453,13 +528,13 @@ public class SBin {
 		lastUnkDataElement.setHexValue(lastUnkDataElement.getHexValue().substring(0, 4 * 2));
 		
 		int prevTextChdrId = 0; // Prevent Text duplicates
-		List<byte[]> splitStringDataBytes = splitByteArray(stringDataBytes, 0x8);
-		int firstStringChdrId = twoLEByteArrayToInt(Arrays.copyOfRange(splitStringDataBytes.get(0), 0, 2));
+		List<byte[]> splitStringDataBytes = HEXUtils.splitByteArray(stringDataBytes, 0x8);
+		int firstStringChdrId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(splitStringDataBytes.get(0), 0, 2));
 		//
 		for (byte[] strDataByteEntry : splitStringDataBytes) {
-			int stringChdrId = twoLEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 0, 2));
-			int textChdrId = twoLEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 2, 4));
-			String unkHexValue = hexToString(Arrays.copyOfRange(strDataByteEntry, 4, 8)).toUpperCase();
+			int stringChdrId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 0, 2));
+			int textChdrId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(strDataByteEntry, 2, 4));
+			String unkHexValue = HEXUtils.hexToString(Arrays.copyOfRange(strDataByteEntry, 4, 8)).toUpperCase();
 			
 			// Create StringData entry. One Text entry can be referenced by more than 1 String entry
 			SBinStringDataEntry stringEntry = new SBinStringDataEntry();
@@ -489,13 +564,13 @@ public class SBin {
 	
 	private void unpackCareerData(SBinJson sbinJson, SBinBlockObj dataBlock) {
 		// Skip garage cars count
-		sbinJson.setCareerFirstDATAByteValue(hexToString(Arrays.copyOfRange(
+		sbinJson.setCareerFirstDATAByteValue(HEXUtils.hexToString(Arrays.copyOfRange(
 				dataBlock.getBlockBytes(), CAREER_DATA_COMMONBYTES + 0x4, CAREER_DATA_COMMONBYTES + 0x8)).toUpperCase());
 		setCurPos(CAREER_DATA_COMMONBYTES); // Skip common bytes on DATA
-		int careerGarageEntriesCount = byteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x4));
+		int careerGarageEntriesCount = HEXUtils.byteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x4));
 		// Get over the first DATA part with cars, and skip the first empty bytes
 		changeCurPos(0x4 + (careerGarageEntriesCount * 4) + 0x4);
-		int firstCarStringId = twoLEByteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x2));
+		int firstCarStringId = HEXUtils.twoLEByteArrayToInt(getBytesFromCurPos(dataBlock.getBlockBytes(), 0x2));
 		
 		List<String> cdatStrings = new ArrayList<>();
 		for (SBinCDATEntry entry : sbinJson.getCDATStrings()) {
@@ -518,28 +593,28 @@ public class SBin {
 		int firstStringCHDRId = 0;
 		// First entry is a header, second is int size
 		for (byte[] dataId : achievementsMap) {
-			int dataIndex = byteArrayToInt(dataId);
+			int dataIndex = HEXUtils.byteArrayToInt(dataId);
 			byte[] achiHex = dataBlock.getBlockElements().get(dataIndex);
 			SBinAchievementEntry achievement = new SBinAchievementEntry();
 			
 			achievement.setOhdrUnkRemainder(sbinJson.getDataElements().get(dataIndex).getOhdrUnkRemainder());
 			if (firstStringCHDRId == 0) {
-				firstStringCHDRId = twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 2, 4));
+				firstStringCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 2, 4));
 			}
 			achievement.setName(
 					getCDATStringByShortCHDRId(achiHex, 2, 4, sbinJson.getCDATStrings()));
 			achievement.setDesc(
 					getCDATStringByShortCHDRId(achiHex, 4, 6, sbinJson.getCDATStrings()));
 			achievement.setPointsInt(
-					byteArrayToInt(Arrays.copyOfRange(achiHex, 6, 10)));
+					HEXUtils.byteArrayToInt(Arrays.copyOfRange(achiHex, 6, 10)));
 			achievement.setAutologAwardId(
 					getCDATStringByShortCHDRId(achiHex, 10, 12, sbinJson.getCDATStrings()));
 			achievement.setCategoryId(
-					twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 14, 16)));
+					HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 14, 16)));
 			achievement.setMetricId(
-					twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 18, 20)));
+					HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(achiHex, 18, 20)));
 			achievement.setMetricTargetInt(
-					byteArrayToInt(Arrays.copyOfRange(achiHex, 22, 26)));
+					HEXUtils.byteArrayToInt(Arrays.copyOfRange(achiHex, 22, 26)));
 			achievement.setImageName(
 					getCDATStringByShortCHDRId(achiHex, 26, 28, sbinJson.getCDATStrings()));
 			achievement.setImageText(
@@ -549,8 +624,8 @@ public class SBin {
 			List<byte[]> metricMilestonesEntries = readDATABlockObjectMap(
 					dataBlock.getBlockElements().get(dataIndex + 1));
 			for (byte[] milestoneDataId : metricMilestonesEntries) {
-				byte[] milestoneHexData = dataBlock.getBlockElements().get(byteArrayToInt(milestoneDataId));
-				metricMilestones.add(byteArrayToInt(Arrays.copyOfRange(milestoneHexData, 2, 6)));
+				byte[] milestoneHexData = dataBlock.getBlockElements().get(HEXUtils.byteArrayToInt(milestoneDataId));
+				metricMilestones.add(HEXUtils.byteArrayToInt(Arrays.copyOfRange(milestoneHexData, 2, 6)));
 			}
 			achievement.setMetricMilestones(metricMilestones);
 			achievementsArray.add(achievement);
@@ -567,7 +642,7 @@ public class SBin {
 		List<SBinPlaylistObj> playlistsJson = new ArrayList<>();
 		
 		for (byte[] playlistDescPos : playlistsMap) {
-			int dataIndex = byteArrayToInt(playlistDescPos);
+			int dataIndex = HEXUtils.byteArrayToInt(playlistDescPos);
 			byte[] playlistDescHex = dataBlock.getBlockElements().get(dataIndex);
 			
 			SBinPlaylistObj playlist = new SBinPlaylistObj();
@@ -579,7 +654,7 @@ public class SBin {
 					dataBlock.getBlockElements().get(dataIndex + 1));
 			playlist.setOhdrStruRemainder(sbinJson.getDataElements().get(dataIndex + 1).getOhdrUnkRemainder());
 			for (byte[] trackId : tracks) {
-				int trackIndex = byteArrayToInt(trackId);
+				int trackIndex = HEXUtils.byteArrayToInt(trackId);
 				byte[] trackHex = dataBlock.getBlockElements().get(trackIndex);
 				SBinPlaylistTrackObj trackObj = new SBinPlaylistTrackObj();
 				
@@ -624,8 +699,8 @@ public class SBin {
 			int chdrToCdatPos = pos;
 			int chdrToCdatSize = cdatEntry.length;
 			pos = pos + chdrToCdatSize + 0x1; // Zero byte-splitter
-			chdrHexStream.write(intToByteArrayLE(chdrToCdatPos, 0x4));
-			chdrHexStream.write(intToByteArrayLE(chdrToCdatSize, 0x4));
+			chdrHexStream.write(HEXUtils.intToByteArrayLE(chdrToCdatPos, 0x4));
+			chdrHexStream.write(HEXUtils.intToByteArrayLE(chdrToCdatSize, 0x4));
 		}
 		block.setBlockBytes(chdrHexStream.toByteArray());
 		
@@ -638,7 +713,7 @@ public class SBin {
 		block.setHeader(header);
 		
 		ByteArrayOutputStream ohdrHexStream = new ByteArrayOutputStream();
-		ohdrHexStream.write(intToByteArrayLE(0x1, 0x4)); // First element in OHDR
+		ohdrHexStream.write(HEXUtils.intToByteArrayLE(0x1, 0x4)); // First element in OHDR
 		int ohdrByteLength = 0x0;
 		for (int i = 0; i < dataBlock.getOHDRMapTemplate().size() - 1; i++) {
 			SBinOHDREntry entry = dataBlock.getOHDRMapTemplate().get(i);
@@ -646,7 +721,7 @@ public class SBin {
 			// I don't know why some of OHDR entries have a small remainder in values.
 			// Adding it as it is works well, usually
 			ohdrByteLength += entryLength;
-			ohdrHexStream.write(intToByteArrayLE(ohdrByteLength + entry.getRemainder(), 0x4));
+			ohdrHexStream.write(HEXUtils.intToByteArrayLE(ohdrByteLength + entry.getRemainder(), 0x4));
 		} // Ignore last DATA element - last OHDR entry ends on DATA length
 		
 		if (sbinJson.getSBinType() == SBinType.CAREER) {
@@ -664,7 +739,7 @@ public class SBin {
 		
 		ByteArrayOutputStream dataHexStream = new ByteArrayOutputStream();
 		for (SBinDataElement dataEntry : sbinJson.getDataElements()) {
-			byte[] dataEntryHex = decodeHexStr(dataEntry.getHexValue());
+			byte[] dataEntryHex = HEXUtils.decodeHexStr(dataEntry.getHexValue());
 			dataHexStream.write(dataEntryHex);
 			block.addToOHDRMapTemplate(dataEntryHex.length, dataEntry.getOhdrUnkRemainder());
 		} // Save common or unknown DATA info
@@ -709,17 +784,17 @@ public class SBin {
 		for (SBinStringDataEntry entry : entries) {
 			if (entry.isTextEntry()) {continue;}
 			dataStrCount++;
-			strDataHexStream.write(shortToBytes((short)entry.getCHDRId().intValue()));
-			strDataHexStream.write(shortToBytes((short)entry.getCHDRIdTextRef().intValue()));
-			strDataHexStream.write(decodeHexStr(entry.getHalVersionValue()));
+			strDataHexStream.write(HEXUtils.shortToBytes((short)entry.getCHDRId().intValue()));
+			strDataHexStream.write(HEXUtils.shortToBytes((short)entry.getCHDRIdTextRef().intValue()));
+			strDataHexStream.write(HEXUtils.decodeHexStr(entry.getHalVersionValue()));
 		}
-		dataHexStream.write(intToByteArrayLE(dataStrCount, 0x4)); // StringData entries count, without Text entries
+		dataHexStream.write(HEXUtils.intToByteArrayLE(dataStrCount, 0x4)); // StringData entries count, without Text entries
 		dataHexStream.write(strDataHexStream.toByteArray());
 	}
 	
 	private void prepareCareerOHDRForSBinBlock(ByteArrayOutputStream ohdrHexStream, int careerGarageCarsCount) throws IOException {
 		for (int i = 0; i < careerGarageCarsCount; i++) {
-			ohdrHexStream.write(intToByteArrayLE(
+			ohdrHexStream.write(HEXUtils.intToByteArrayLE(
 					CAREER_OHDR_GARAGECARS_BASEVALUE + (0x20 * careerGarageCarsCount) + (0x20 * i), 0x4));
 		}
 		
@@ -729,17 +804,17 @@ public class SBin {
 		ByteArrayOutputStream careerData1HexStream = new ByteArrayOutputStream();
 		ByteArrayOutputStream careerData2HexStream = new ByteArrayOutputStream();
 		int careerCarsGarageCount = sbinJson.getCareerGarageCarsArray().size();
-		careerData1HexStream.write(intToByteArrayLE(careerCarsGarageCount, 0x4));
+		careerData1HexStream.write(HEXUtils.intToByteArrayLE(careerCarsGarageCount, 0x4));
 		// First value in part 2 block
 		careerData2HexStream.write(SHORTBYTE_EMPTY); 
 		careerData2HexStream.write(CAREER_DATA_P2_SHORTBYTES);
 		
-		int minimalCareerDataP1Value = byteArrayToInt(decodeHexStr(sbinJson.getCareerFirstDATAByteValue()));
+		int minimalCareerDataP1Value = HEXUtils.byteArrayToInt(HEXUtils.decodeHexStr(sbinJson.getCareerFirstDATAByteValue()));
 		int minimalCareerDataP2Value = sbinJson.getCDATStrings().size();
 		
 		for (int i = 0; i < sbinJson.getCareerGarageCarsArray().size(); i++) {
-			careerData1HexStream.write(intToByteArrayLE(minimalCareerDataP1Value + i, 0x4));
-			careerData2HexStream.write(shortToBytes(minimalCareerDataP2Value + i));
+			careerData1HexStream.write(HEXUtils.intToByteArrayLE(minimalCareerDataP1Value + i, 0x4));
+			careerData2HexStream.write(HEXUtils.shortToBytes(minimalCareerDataP2Value + i));
 			if (i + 1 < sbinJson.getCareerGarageCarsArray().size()) {
 				careerData2HexStream.write(CAREER_DATA_P2_SHORTBYTES);
 			} else { // Last one must be empty
@@ -756,42 +831,42 @@ public class SBin {
 		
 		orderId++; // Skip map entry
 		SBinStructureEntryHex achiMap = new SBinStructureEntryHex();
-		achiMap.setHeader(intToByteArrayLE(0xF, 0x4));
-		achiMap.setSize(intToByteArrayLE(sbinJson.getAchievementArray().size(), 0x4));
+		achiMap.setHeader(HEXUtils.intToByteArrayLE(0xF, 0x4));
+		achiMap.setSize(HEXUtils.intToByteArrayLE(sbinJson.getAchievementArray().size(), 0x4));
 		
 		ByteArrayOutputStream achiCollectionHexStream = new ByteArrayOutputStream();
 		List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
 		for (SBinAchievementEntry achievement : sbinJson.getAchievementArray()) {
-			achiMap.addToDataIds(intToByteArrayLE(orderId, 0x4)); // Add achievement to map
+			achiMap.addToDataIds(HEXUtils.intToByteArrayLE(orderId, 0x4)); // Add achievement to map
 			orderId++;
 			
 			SBinAchievementEntryHex achiHex = new SBinAchievementEntryHex();
 			achiHex.setOhdrUnkRemainder(achievement.getOhdrUnkRemainder());
 			achiHex.setName(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getName()));
 			achiHex.setDesc(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getDesc()));
-			achiHex.setPoints(intToByteArrayLE(achievement.getPointsInt(), 0x4));
+			achiHex.setPoints(HEXUtils.intToByteArrayLE(achievement.getPointsInt(), 0x4));
 			achiHex.setAutologAwardId(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getAutologAwardId()));
-			achiHex.setCategoryId(intToByteArrayLE(achievement.getCategoryId(), 0x4));
-			achiHex.setMetricId(intToByteArrayLE(achievement.getMetricId(), 0x4));
-			achiHex.setMetricTarget(intToByteArrayLE(achievement.getMetricTargetInt(), 0x4));
+			achiHex.setCategoryId(HEXUtils.intToByteArrayLE(achievement.getCategoryId(), 0x4));
+			achiHex.setMetricId(HEXUtils.intToByteArrayLE(achievement.getMetricId(), 0x4));
+			achiHex.setMetricTarget(HEXUtils.intToByteArrayLE(achievement.getMetricTargetInt(), 0x4));
 			achiHex.setImageName(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getImageName()));
 			achiHex.setImageText(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getImageText()));
-			achiHex.setOrderId(shortToBytes((short)orderId));
+			achiHex.setOrderId(HEXUtils.shortToBytes((short)orderId));
 			
 			SBinStructureEntryHex structure = new SBinStructureEntryHex();
-			structure.setHeader(intToByteArrayLE(0xF, 0x4));
-			structure.setSize(intToByteArrayLE(achievement.getMetricMilestones().size(), 0x4));
+			structure.setHeader(HEXUtils.intToByteArrayLE(0xF, 0x4));
+			structure.setSize(HEXUtils.intToByteArrayLE(achievement.getMetricMilestones().size(), 0x4));
 			
 			for (int i = 0; i < achievement.getMetricMilestones().size(); i++) {
-				structure.addToDataIds(intToByteArrayLE(orderId + i + 1, 0x4));
+				structure.addToDataIds(HEXUtils.intToByteArrayLE(orderId + i + 1, 0x4));
 			} // MetricMilestones map
 			achiHex.setMetricMilestonesMap(structure);
 			orderId++;
 			
 			for (Integer milestone : achievement.getMetricMilestones()) {
 				SBinAchievementMilestoneEntryHex milestoneEntry = new SBinAchievementMilestoneEntryHex();
-				milestoneEntry.setHeader(shortToBytes((short)0x4));
-				milestoneEntry.setIntValue(intToByteArrayLE(milestone, 0x4));
+				milestoneEntry.setHeader(HEXUtils.shortToBytes((short)0x4));
+				milestoneEntry.setIntValue(HEXUtils.intToByteArrayLE(milestone, 0x4));
 				achiHex.addToMetricMilestones(milestoneEntry);
 				orderId++;
 			}
@@ -817,32 +892,32 @@ public class SBin {
 		
 		orderId++; // Skip map entry
 		SBinStructureEntryHex playlistsMap = new SBinStructureEntryHex();
-		playlistsMap.setHeader(intToByteArrayLE(0xF, 0x4));
-		playlistsMap.setSize(intToByteArrayLE(sbinJson.getPlaylistsArray().size(), 0x4));
+		playlistsMap.setHeader(HEXUtils.intToByteArrayLE(0xF, 0x4));
+		playlistsMap.setSize(HEXUtils.intToByteArrayLE(sbinJson.getPlaylistsArray().size(), 0x4));
 		playlistsMap.setPadding(new byte[0]);
 		
 		ByteArrayOutputStream playlistCollectionHexStream = new ByteArrayOutputStream();
 		List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
 		for (SBinPlaylistObj playlist : sbinJson.getPlaylistsArray()) {
-			playlistsMap.addToDataIds(intToByteArrayLE(orderId, 0x4)); // Add playlist to map
+			playlistsMap.addToDataIds(HEXUtils.intToByteArrayLE(orderId, 0x4)); // Add playlist to map
 			orderId++;
 			
 			SBinPlaylistEntryHex playlistHex = new SBinPlaylistEntryHex();
 			playlistHex.setOhdrDescRemainder(playlist.getOhdrDescRemainder());
 			playlistHex.setOhdrStruRemainder(playlist.getOhdrStruRemainder());
-			playlistHex.setHeader(shortToBytes((short)0x2));
+			playlistHex.setHeader(HEXUtils.shortToBytes((short)0x2));
 			playlistHex.setUnkHex1(PLAYLISTS_DATA_DESC_UNK1);
 			playlistHex.setName(processStringInCDAT(sbinJson.getCDATStrings(), playlist.getName()));
 			playlistHex.setUnkHex2(PLAYLISTS_DATA_DESC_UNK2);
-			playlistHex.setOrderId(shortToBytes((short)orderId));
+			playlistHex.setOrderId(HEXUtils.shortToBytes((short)orderId));
 			
 			SBinStructureEntryHex tracksMap = new SBinStructureEntryHex();
-			tracksMap.setHeader(intToByteArrayLE(0xF, 0x4));
-			tracksMap.setSize(intToByteArrayLE(playlist.getPlaylist().size(), 0x4));
+			tracksMap.setHeader(HEXUtils.intToByteArrayLE(0xF, 0x4));
+			tracksMap.setSize(HEXUtils.intToByteArrayLE(playlist.getPlaylist().size(), 0x4));
 			tracksMap.setPadding(new byte[0]);
 			
 			for (int i = 0; i < playlist.getPlaylist().size(); i++) {
-				tracksMap.addToDataIds(intToByteArrayLE(orderId + i + 1, 0x4));
+				tracksMap.addToDataIds(HEXUtils.intToByteArrayLE(orderId + i + 1, 0x4));
 			} 
 			playlistHex.setTracksMap(tracksMap);
 			orderId++;
@@ -850,7 +925,7 @@ public class SBin {
 			for (SBinPlaylistTrackObj track : playlist.getPlaylist()) {
 				SBinPlaylistTrackHex trackEntry = new SBinPlaylistTrackHex();
 				trackEntry.setOhdrUnkRemainder(track.getOhdrUnkRemainder());
-				trackEntry.setHeader(shortToBytes((short)0x3));
+				trackEntry.setHeader(HEXUtils.shortToBytes((short)0x3));
 				trackEntry.setUnkHex1(PLAYLISTS_DATA_TRACK_UNK1);
 				trackEntry.setFilePath(processStringInCDAT(sbinJson.getCDATStrings(), track.getFilePath()));
 				trackEntry.setUnkHex2(PLAYLISTS_DATA_TRACK_UNK2);
@@ -872,107 +947,23 @@ public class SBin {
 		block.getOHDRMapTemplate().addAll(ohdrMapTemplate);
 		return playlistsDataHexStream.toByteArray();
 	}
-
+	
 	//
 	// Util methods
 	//
-
+	
 	private static void changeCurPos(int addition) {
 		curPos = curPos + addition;
-//		System.out.println("### curPos: " + Integer.toHexString(curPos));
+		//		System.out.println("### curPos: " + Integer.toHexString(curPos));
 	}
-	
+
 	private static void setCurPos(int newPos) {
 		curPos = newPos;
-//		System.out.println("### curPos: " + Integer.toHexString(curPos));
+		//		System.out.println("### curPos: " + Integer.toHexString(curPos));
 	}
 	
-	private static void addElementsToByteArraysList(List<String> list, List<byte[]> blockElements) {
-		for (String entry : list) {
-			blockElements.add(entry.getBytes(StandardCharsets.UTF_8));
-		}
-	}
-	
-	private static void addCDATElementsToByteArraysList(List<SBinCDATEntry> list, List<byte[]> blockElements) {
-		for (SBinCDATEntry entry : list) {
-			blockElements.add(entry.getString().getBytes(StandardCharsets.UTF_8));
-		}
-	}
-	
-	private void writeBytesWithAddition(ByteArrayOutputStream hexStream, int baseValue, int addition) throws IOException {
-		hexStream.write(intToByteArrayLE(baseValue + addition, 0x4));
-	}
-	
-	public static int byteArrayToInt(byte[] bytes) {
-		int beInt = ((bytes[0] & 0xFF) << 24) | 
-				((bytes[1] & 0xFF) << 16) | 
-				((bytes[2] & 0xFF) << 8) | 
-				((bytes[3] & 0xFF) << 0);
-		return hexRev(beInt);
-	}
-	
-	public static int twoLEByteArrayToInt(byte[] bytes) {
-		return ((bytes[1] & 0xFF) << 8) | (bytes[0] & 0xFF);
-	}
-
 	private byte[] getBytesFromCurPos(byte[] data, int to) {
 		return Arrays.copyOfRange(data, curPos, curPos + to);
-	}
-
-	private byte[] intToByteArrayLE(int data, int size) {    
-		return ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN).putInt(data).array(); 
-	}
-	
-	private byte[] shortToBytes(int data) {
-        return ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN).putShort((short)data).array();
-    }
-
-	// Taken from StackOverflow (maybeWeCouldStealAVan)
-	private String hexToString(byte[] bytes) {
-		byte[] hexChars = new byte[bytes.length * 2];
-		for (int j = 0; j < bytes.length; j++) {
-			int v = bytes[j] & 0xFF;
-			hexChars[j * 2] = HEX_ARRAY[v >>> 4];
-			hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
-		}
-		return new String(hexChars, StandardCharsets.UTF_8);
-	}
-
-	private static byte[] decodeHexStr(String str) {
-		int len = str.length();
-		byte[] data = new byte[len / 2];
-		for (int i = 0; i < len; i += 2) {
-			data[i / 2] = (byte) ((Character.digit(str.charAt(i), 16) << 4)
-					+ Character.digit(str.charAt(i+1), 16));
-		}
-		return data;
-	}
-	
-	// https://stackoverflow.com/a/66638297
-	public List<byte[]> splitByteArray(byte[] array, int chunkSize) {
-	    List<byte[]> chunks = new ArrayList<>();
-	    for (int i = 0; i < array.length; ) {
-	        byte[] chunk = new byte[Math.min(chunkSize, array.length - i)];
-	        for (int j = 0; j < chunk.length; j++, i++) {
-	            chunk[j] = array[i];
-	        }
-	        chunks.add(chunk);
-	    }
-	    return chunks;
-	}
-
-	public static int hexRev(int n)
-	{
-		return ((n >> 24) & 0xff)
-				| // (n >> 24) - 0x000000aa
-				((n << 8) & 0xff0000)
-				| // (n << 24) - 0xdd000000
-				((n >> 8) & 0xff00)
-				| // (((n >> 16) << 24) >> 16) - 0xbb00
-				((n << 24) & 0xff000000); // (((n >> 8) << 24)
-		// >> 8) - 0xcc0000
-		// If output of all the above expression is
-		// OR'ed then it results in 0xddccbbaa
 	}
 	
 }

@@ -1,0 +1,661 @@
+package util;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class HEXClasses {
+	private HEXClasses() {}
+	
+	private static final byte[] SHORT_EMPTYBYTES = new byte[2];
+	private static final byte[] INT_EMPTYBYTES = new byte[4];
+	private static final int OHDR_MULTIPLIER = 0x8;
+	
+	public static class SBinBlockObj {
+		private byte[] header;
+		private byte[] blockSize = new byte[4];
+		private int blockSizeInt = 0;
+		private byte[] fnv1Hash;
+		private int blockEmptyBytesCount = 0;
+		private byte[] blockBytes = new byte[0];
+		private List<byte[]> blockElements;
+		private List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
+		
+		public void addToOHDRMapTemplate(Integer entrySize, Integer remainder) {
+			this.ohdrMapTemplate.add(new SBinOHDREntry(entrySize, remainder));
+		}
+		
+		public byte[] getHeader() {
+			return header;
+		}
+		public void setHeader(byte[] header) {
+			this.header = header;
+		}
+		
+		public byte[] getBlockSize() {
+			return blockSize;
+		}
+		public void setBlockSize(byte[] blockSize) {
+			this.blockSize = blockSize;
+		}
+		
+		public int getBlockSizeInt() {
+			return blockSizeInt;
+		}
+		public void setBlockSizeInt(int blockSizeInt) {
+			this.blockSizeInt = blockSizeInt;
+		}
+		
+		public byte[] getFnv1Hash() {
+			return fnv1Hash;
+		}
+		public void setFnv1Hash(byte[] fnv1Hash) {
+			this.fnv1Hash = fnv1Hash;
+		}
+		
+		public int getBlockEmptyBytesCount() {
+			return blockEmptyBytesCount;
+		}
+		public void setBlockEmptyBytesCount(int blockEmptyBytesCount) {
+			this.blockEmptyBytesCount = blockEmptyBytesCount;
+		}
+		
+		public byte[] getBlockBytes() {
+			return blockBytes;
+		}
+		public void setBlockBytes(byte[] blockBytes) {
+			this.blockBytes = blockBytes;
+		}
+		
+		public List<byte[]> getBlockElements() {
+			return blockElements;
+		}
+		public void setBlockElements(List<byte[]> blockElements) {
+			this.blockElements = blockElements;
+		}
+
+		public List<SBinOHDREntry> getOHDRMapTemplate() {
+			return ohdrMapTemplate;
+		}
+		public void setOHDRMapTemplate(List<SBinOHDREntry> ohdrMapTemplate) {
+			this.ohdrMapTemplate = ohdrMapTemplate;
+		}
+	}
+	
+	public static class SBinOHDREntry {
+		private int value;
+		private int remainder;
+		
+		public SBinOHDREntry(int value, int remainder) {
+			this.value = value * OHDR_MULTIPLIER;
+			this.remainder = remainder;
+		}
+		
+		public int getValue() {
+			return value;
+		}
+		public void setValue(int value) {
+			this.value = value * OHDR_MULTIPLIER;
+		}
+		
+		public int getRemainder() {
+			return remainder;
+		}
+		public void setRemainder(int remainder) {
+			this.remainder = remainder;
+		}
+	}
+	
+	public static class SBinStructureEntryHex {
+		private byte[] header = INT_EMPTYBYTES;
+		private byte[] size = INT_EMPTYBYTES;
+		private List<byte[]> dataIds = new ArrayList<>();
+		private byte[] padding = SHORT_EMPTYBYTES;
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.header);
+			bytes.write(this.size);
+			for (byte[] obj : this.dataIds) {
+				bytes.write(obj);
+			}
+			bytes.write(this.padding);
+			return bytes.toByteArray();
+		}
+		
+		public void addToDataIds(byte[] dataId) {
+			this.dataIds.add(dataId);
+		}
+		
+		public Integer getByteSize() {
+			return 0x8 + (this.dataIds.size() * 4) + this.padding.length;
+		}
+		
+		public byte[] getHeader() {
+			return header;
+		}
+		public void setHeader(byte[] header) {
+			this.header = header;
+		}
+		
+		public byte[] getSize() {
+			return size;
+		}
+		public void setSize(byte[] size) {
+			this.size = size;
+		}
+		
+		public List<byte[]> getDataIds() {
+			return dataIds;
+		}
+		public void setDataIds(List<byte[]> dataIds) {
+			this.dataIds = dataIds;
+		}
+		
+		public byte[] getPadding() {
+			return padding;
+		}
+		public void setPadding(byte[] padding) {
+			this.padding = padding;
+		}
+	}
+	
+	public static class SBinStructHex {
+		private byte[] nameCHDRRef = SHORT_EMPTYBYTES;
+		private byte[] firstFieldOffset = SHORT_EMPTYBYTES;
+		private byte[] fieldCount = SHORT_EMPTYBYTES;
+		private List<SBinFieldHex> fields = new ArrayList<>();
+		
+		public void addToFields(SBinFieldHex field) {
+			this.fields.add(field);
+		}
+		
+		public byte[] getNameCHDRRef() {
+			return nameCHDRRef;
+		}
+		public void setNameCHDRRef(byte[] nameCHDRRef) {
+			this.nameCHDRRef = nameCHDRRef;
+		}
+		
+		public byte[] getFirstFieldOffset() {
+			return firstFieldOffset;
+		}
+		public void setFirstFieldOffset(byte[] firstFieldOffset) {
+			this.firstFieldOffset = firstFieldOffset;
+		}
+		
+		public byte[] getFieldCount() {
+			return fieldCount;
+		}
+		public void setFieldCount(byte[] fieldCount) {
+			this.fieldCount = fieldCount;
+		}
+
+		public List<SBinFieldHex> getFields() {
+			return fields;
+		}
+		public void setFields(List<SBinFieldHex> fields) {
+			this.fields = fields;
+		}
+	}
+	
+	public static class SBinFieldHex {
+		private byte[] nameCHDRRef = SHORT_EMPTYBYTES;
+		private byte[] type = SHORT_EMPTYBYTES;
+		private byte[] startOffset = SHORT_EMPTYBYTES;
+		private byte[] unkOrderId = SHORT_EMPTYBYTES;
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.nameCHDRRef);
+			bytes.write(this.type);
+			bytes.write(this.startOffset);
+			bytes.write(this.unkOrderId);
+			return bytes.toByteArray();
+		}
+		
+		public byte[] getNameCHDRRef() {
+			return nameCHDRRef;
+		}
+		public void setNameCHDRRef(byte[] nameCHDRRef) {
+			this.nameCHDRRef = nameCHDRRef;
+		}
+		
+		public byte[] getType() {
+			return type;
+		}
+		public void setType(byte[] type) {
+			this.type = type;
+		}
+		
+		public byte[] getStartOffset() {
+			return startOffset;
+		}
+		public void setStartOffset(byte[] startOffset) {
+			this.startOffset = startOffset;
+		}
+		
+		public byte[] getUnkOrderId() {
+			return unkOrderId;
+		}
+		public void setUnkOrderId(byte[] unkOrderId) {
+			this.unkOrderId = unkOrderId;
+		}
+	}
+		
+	public static class SBinAchievementEntryHex {
+		private int ohdrUnkRemainder = 0;
+		private byte[] padding1 = SHORT_EMPTYBYTES;
+		private byte[] name = SHORT_EMPTYBYTES;
+		private byte[] desc = SHORT_EMPTYBYTES;
+		private byte[] points = INT_EMPTYBYTES;
+		private byte[] autologAwardId = SHORT_EMPTYBYTES;
+		private byte[] padding2 = SHORT_EMPTYBYTES;
+		private byte[] categoryId = INT_EMPTYBYTES;
+		private byte[] metricId = INT_EMPTYBYTES;
+		private byte[] metricTarget = INT_EMPTYBYTES;
+		private byte[] imageName = SHORT_EMPTYBYTES;
+		private byte[] imageText = SHORT_EMPTYBYTES;
+		private byte[] orderId = SHORT_EMPTYBYTES;
+		private byte[] padding3 = SHORT_EMPTYBYTES;
+		private SBinStructureEntryHex metricMilestonesMap;
+		private List<SBinAchievementMilestoneEntryHex> metricMilestones = new ArrayList<>();
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.padding1);
+			bytes.write(this.name);
+			bytes.write(this.desc);
+			bytes.write(this.points);
+			bytes.write(this.autologAwardId);
+			bytes.write(this.padding2);
+			bytes.write(this.categoryId);
+			bytes.write(this.metricId);
+			bytes.write(this.metricTarget);
+			bytes.write(this.imageName);
+			bytes.write(this.imageText);
+			bytes.write(this.orderId);
+			bytes.write(this.padding3);
+			bytes.write(this.metricMilestonesMap.toByteArray());
+			for (SBinAchievementMilestoneEntryHex obj : this.metricMilestones) {
+				bytes.write(obj.toByteArray());
+			}
+			return bytes.toByteArray();
+		}
+		
+		public List<SBinOHDREntry> ohdrMapTemplate() {
+			List<SBinOHDREntry> ohdrEntries = new ArrayList<>();
+			ohdrEntries.add(new SBinOHDREntry(0x22, this.ohdrUnkRemainder));
+			ohdrEntries.add(new SBinOHDREntry(this.metricMilestonesMap.getByteSize(), 0));
+			for (SBinAchievementMilestoneEntryHex obj : this.metricMilestones) {
+				ohdrEntries.add(new SBinOHDREntry(obj.getByteSize(), 0));
+			}
+			return ohdrEntries;
+		}
+		
+		public void addToMetricMilestones(SBinAchievementMilestoneEntryHex milestoneObj) {
+			this.metricMilestones.add(milestoneObj);
+		}
+		
+		public int getOhdrUnkRemainder() {
+			return ohdrUnkRemainder;
+		}
+		public void setOhdrUnkRemainder(int ohdrUnkRemainder) {
+			this.ohdrUnkRemainder = ohdrUnkRemainder;
+		}
+
+		public byte[] getPadding1() {
+			return padding1;
+		}
+		public void setPadding1(byte[] padding1) {
+			this.padding1 = padding1;
+		}
+		
+		public byte[] getName() {
+			return name;
+		}
+		public void setName(byte[] name) {
+			this.name = name;
+		}
+		
+		public byte[] getDesc() {
+			return desc;
+		}
+		public void setDesc(byte[] desc) {
+			this.desc = desc;
+		}
+		
+		public byte[] getPoints() {
+			return points;
+		}
+		public void setPoints(byte[] points) {
+			this.points = points;
+		}
+		
+		public byte[] getAutologAwardId() {
+			return autologAwardId;
+		}
+		public void setAutologAwardId(byte[] autologAwardId) {
+			this.autologAwardId = autologAwardId;
+		}
+		
+		public byte[] getPadding2() {
+			return padding2;
+		}
+		public void setPadding2(byte[] padding2) {
+			this.padding2 = padding2;
+		}
+		
+		public byte[] getCategoryId() {
+			return categoryId;
+		}
+		public void setCategoryId(byte[] categoryId) {
+			this.categoryId = categoryId;
+		}
+		
+		public byte[] getMetricId() {
+			return metricId;
+		}
+		public void setMetricId(byte[] metricId) {
+			this.metricId = metricId;
+		}
+		
+		public byte[] getMetricTarget() {
+			return metricTarget;
+		}
+		public void setMetricTarget(byte[] metricTarget) {
+			this.metricTarget = metricTarget;
+		}
+		
+		public byte[] getImageName() {
+			return imageName;
+		}
+		public void setImageName(byte[] imageName) {
+			this.imageName = imageName;
+		}
+		
+		public byte[] getImageText() {
+			return imageText;
+		}
+		public void setImageText(byte[] imageText) {
+			this.imageText = imageText;
+		}
+		
+		public byte[] getOrderId() {
+			return orderId;
+		}
+		public void setOrderId(byte[] orderId) {
+			this.orderId = orderId;
+		}
+		
+		public byte[] getPadding3() {
+			return padding3;
+		}
+		public void setPadding3(byte[] padding3) {
+			this.padding3 = padding3;
+		}
+		
+		public SBinStructureEntryHex getMetricMilestonesMap() {
+			return metricMilestonesMap;
+		}
+		public void setMetricMilestonesMap(SBinStructureEntryHex metricMilestonesMap) {
+			this.metricMilestonesMap = metricMilestonesMap;
+		}
+		
+		public List<SBinAchievementMilestoneEntryHex> getMetricMilestones() {
+			return metricMilestones;
+		}
+		public void setMetricMilestones(List<SBinAchievementMilestoneEntryHex> metricMilestones) {
+			this.metricMilestones = metricMilestones;
+		}
+	}
+	
+	public static class SBinAchievementMilestoneEntryHex {
+		private byte[] header = SHORT_EMPTYBYTES;
+		private byte[] intValue = INT_EMPTYBYTES;
+		private byte[] padding = SHORT_EMPTYBYTES;
+		
+		private int byteSize = 0x8;
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.header);
+			bytes.write(this.intValue);
+			bytes.write(this.padding);
+			return bytes.toByteArray();
+		}
+		
+		public Integer getByteSize() {
+			return this.byteSize;
+		}
+		
+		public byte[] getHeader() {
+			return header;
+		}
+		public void setHeader(byte[] header) {
+			this.header = header;
+		}
+		
+		public byte[] getIntValue() {
+			return intValue;
+		}
+		public void setIntValue(byte[] intValue) {
+			this.intValue = intValue;
+		}
+		
+		public byte[] getPadding() {
+			return padding;
+		}
+		public void setPadding(byte[] padding) {
+			this.padding = padding;
+		}
+	}
+	
+	public static class SBinPlaylistEntryHex {
+		private int ohdrDescRemainder = 0;
+		private int ohdrStruRemainder = 0;
+		private byte[] header = SHORT_EMPTYBYTES;
+		private byte[] unkHex1 = new byte[10];
+		private byte[] name = SHORT_EMPTYBYTES;
+		private byte[] unkHex2 = new byte[10];
+		private byte[] orderId = SHORT_EMPTYBYTES;
+		private byte[] padding = SHORT_EMPTYBYTES;
+		private SBinStructureEntryHex tracksMap;
+		private List<SBinPlaylistTrackHex> tracks = new ArrayList<>();
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.header);
+			bytes.write(this.unkHex1);
+			bytes.write(this.name);
+			bytes.write(this.unkHex2);
+			bytes.write(this.orderId);
+			bytes.write(this.padding);
+			bytes.write(this.tracksMap.toByteArray());
+			for (SBinPlaylistTrackHex obj : this.tracks) {
+				bytes.write(obj.toByteArray());
+			}
+			return bytes.toByteArray();
+		}
+		
+		public List<SBinOHDREntry> ohdrMapTemplate() {
+			List<SBinOHDREntry> ohdrEntries = new ArrayList<>();
+			ohdrEntries.add(new SBinOHDREntry(0x1C, this.ohdrDescRemainder));
+			ohdrEntries.add(new SBinOHDREntry(this.tracksMap.getByteSize(), this.ohdrStruRemainder));
+			for (SBinPlaylistTrackHex obj : this.tracks) {
+				ohdrEntries.add(new SBinOHDREntry(obj.getByteSize(), obj.getOhdrUnkRemainder()));
+			}
+			return ohdrEntries;
+		}
+		
+		public void addToPlaylistTracks(SBinPlaylistTrackHex trackObj) {
+			this.tracks.add(trackObj);
+		}
+
+		public int getOhdrDescRemainder() {
+			return ohdrDescRemainder;
+		}
+		public void setOhdrDescRemainder(int ohdrDescRemainder) {
+			this.ohdrDescRemainder = ohdrDescRemainder;
+		}
+
+		public int getOhdrStruRemainder() {
+			return ohdrStruRemainder;
+		}
+		public void setOhdrStruRemainder(int ohdrStruRemainder) {
+			this.ohdrStruRemainder = ohdrStruRemainder;
+		}
+
+		public byte[] getHeader() {
+			return header;
+		}
+		public void setHeader(byte[] header) {
+			this.header = header;
+		}
+
+		public byte[] getUnkHex1() {
+			return unkHex1;
+		}
+		public void setUnkHex1(byte[] unkHex1) {
+			this.unkHex1 = unkHex1;
+		}
+
+		public byte[] getName() {
+			return name;
+		}
+		public void setName(byte[] name) {
+			this.name = name;
+		}
+
+		public byte[] getUnkHex2() {
+			return unkHex2;
+		}
+		public void setUnkHex2(byte[] unkHex2) {
+			this.unkHex2 = unkHex2;
+		}
+
+		public byte[] getOrderId() {
+			return orderId;
+		}
+		public void setOrderId(byte[] orderId) {
+			this.orderId = orderId;
+		}
+
+		public byte[] getPadding() {
+			return padding;
+		}
+		public void setPadding(byte[] padding) {
+			this.padding = padding;
+		}
+
+		public SBinStructureEntryHex getTracksMap() {
+			return tracksMap;
+		}
+		public void setTracksMap(SBinStructureEntryHex tracksMap) {
+			this.tracksMap = tracksMap;
+		}
+
+		public List<SBinPlaylistTrackHex> getTracks() {
+			return tracks;
+		}
+		public void setTracks(List<SBinPlaylistTrackHex> tracks) {
+			this.tracks = tracks;
+		}
+	}
+	
+	public static class SBinPlaylistTrackHex {
+		private int ohdrUnkRemainder = 0;
+		private byte[] header = SHORT_EMPTYBYTES;
+		private byte[] unkHex1 = new byte[10];
+		private byte[] filePath = SHORT_EMPTYBYTES;
+		private byte[] unkHex2 = new byte[8];
+		private byte[] artist = SHORT_EMPTYBYTES;
+		private byte[] unkHex3 = new byte[8];
+		private byte[] title = SHORT_EMPTYBYTES;
+		private byte[] padding = SHORT_EMPTYBYTES;
+		
+		private int byteSize = 0x24;
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.header);
+			bytes.write(this.unkHex1);
+			bytes.write(this.filePath);
+			bytes.write(this.unkHex2);
+			bytes.write(this.artist);
+			bytes.write(this.unkHex3);
+			bytes.write(this.title);
+			bytes.write(this.padding);
+			return bytes.toByteArray();
+		}
+		
+		public Integer getByteSize() {
+			return this.byteSize;
+		}
+		
+		public int getOhdrUnkRemainder() {
+			return ohdrUnkRemainder;
+		}
+		public void setOhdrUnkRemainder(int ohdrUnkRemainder) {
+			this.ohdrUnkRemainder = ohdrUnkRemainder;
+		}
+		
+		public byte[] getHeader() {
+			return header;
+		}
+		public void setHeader(byte[] header) {
+			this.header = header;
+		}
+
+		public byte[] getUnkHex1() {
+			return unkHex1;
+		}
+		public void setUnkHex1(byte[] unkHex1) {
+			this.unkHex1 = unkHex1;
+		}
+		
+		public byte[] getFilePath() {
+			return filePath;
+		}
+		public void setFilePath(byte[] filePath) {
+			this.filePath = filePath;
+		}
+		
+		public byte[] getUnkHex2() {
+			return unkHex2;
+		}
+		public void setUnkHex2(byte[] unkHex2) {
+			this.unkHex2 = unkHex2;
+		}
+		
+		public byte[] getArtist() {
+			return artist;
+		}
+		public void setArtist(byte[] artist) {
+			this.artist = artist;
+		}
+		
+		public byte[] getUnkHex3() {
+			return unkHex3;
+		}
+		public void setUnkHex3(byte[] unkHex3) {
+			this.unkHex3 = unkHex3;
+		}
+		
+		public byte[] getTitle() {
+			return title;
+		}
+		public void setTitle(byte[] title) {
+			this.title = title;
+		}
+		
+		public byte[] getPadding() {
+			return padding;
+		}
+		public void setPadding(byte[] padding) {
+			this.padding = padding;
+		}
+	}
+
+}
