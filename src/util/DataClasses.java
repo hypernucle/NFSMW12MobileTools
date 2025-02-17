@@ -52,6 +52,8 @@ public final class DataClasses {
 		@SerializedName("BARG_HexEmptyBytesCount")
 		private Long bargHexEmptyBytesCount;
 		//
+		@SerializedName("Enums")
+		private List<SBinEnum> enums;
 		@SerializedName("Structs")
 		private List<SBinStruct> structs = new ArrayList<>();
 		@SerializedName("DATA_Elements")
@@ -222,6 +224,13 @@ public final class DataClasses {
 			this.structs.add(struct);
 		}
 		
+		public List<SBinEnum> getEnums() {
+			return enums;
+		}
+		public void setEnums(List<SBinEnum> enums) {
+			this.enums = enums;
+		}
+		
 		public List<SBinStruct> getStructs() {
 			return structs;
 		}
@@ -357,6 +366,27 @@ public final class DataClasses {
 		}
 	}
 	
+	public static class SBinEnum {
+		@SerializedName("Name")
+		private String name;
+		@SerializedName("DataId_MapRef")
+		private String dataIdMapRef;
+
+		public String getName() {
+			return name;
+		}
+		public void setName(String name) {
+			this.name = name;
+		}
+		
+		public String getDataIdMapRef() {
+			return dataIdMapRef;
+		}
+		public void setDataIdMapRef(String dataIdMapRef) {
+			this.dataIdMapRef = dataIdMapRef;
+		}
+	}
+	
 	public static class SBinStruct {
 		@SerializedName("Name")
 		private String name;
@@ -393,8 +423,8 @@ public final class DataClasses {
 		private int fieldSize = 0;
 		@SerializedName("DynamicSize")
 		private boolean dynamicSize = false;
-		@SerializedName("UnkOrderId")
-		private int unkOrderId = 0;
+		@SerializedName("SpecOrderId")
+		private int specOrderId = 0;
 		
 		private SBinFieldType fieldTypeEnum;
 		
@@ -433,11 +463,11 @@ public final class DataClasses {
 			this.dynamicSize = dynamicSize;
 		}
 		
-		public int getUnkOrderId() {
-			return unkOrderId;
+		public int getSpecOrderId() {
+			return specOrderId;
 		}
-		public void setUnkOrderId(int unkOrderId) {
-			this.unkOrderId = unkOrderId;
+		public void setSpecOrderId(int specOrderId) {
+			this.specOrderId = specOrderId;
 		}
 		
 		public SBinFieldType getFieldTypeEnum() {
@@ -459,6 +489,10 @@ public final class DataClasses {
 		private String extraHexValue;
 		@SerializedName("StructName")
 		private String structName;
+		@SerializedName("DataIDsMap")
+		private List<String> dataIdsMap;
+		@SerializedName("EnumMap")
+		private List<String> enumMap;
 		@SerializedName("Fields")
 		private List<SBinDataField> fields;
 		
@@ -495,6 +529,20 @@ public final class DataClasses {
 		}
 		public void setStructName(String structName) {
 			this.structName = structName;
+		}
+		
+		public List<String> getDataIdsMap() {
+			return dataIdsMap;
+		}
+		public void setDataIdsMap(List<String> dataIdsMap) {
+			this.dataIdsMap = dataIdsMap;
+		}
+		
+		public List<String> getEnumMap() {
+			return enumMap;
+		}
+		public void setEnumMap(List<String> enumMap) {
+			this.enumMap = enumMap;
 		}
 		
 		public List<SBinDataField> getFields() {

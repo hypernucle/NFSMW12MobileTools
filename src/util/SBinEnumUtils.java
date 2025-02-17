@@ -17,7 +17,7 @@ public class SBinEnumUtils {
 		case INT8:
 			size = 0x1;
 			break;
-		case INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case INT32_0X12: case INT32_0X16:
+		case INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case ENUM_ID_INT32: case INT32_0X16:
 			size = 0x4;
 			break;
 		case BOOLEAN: case CHDR_ID_REF:
@@ -37,7 +37,7 @@ public class SBinEnumUtils {
 			return getDefaultHEXString(valueHex, dataField);
 		}
 		switch(field.getFieldTypeEnum()) {
-		case INT32: case INT32_0X12: case INT32_0X16:
+		case INT32: case ENUM_ID_INT32: case INT32_0X16:
 			strValue = String.valueOf(HEXUtils.byteArrayToInt(valueHex));
 			break;
 		case FLOAT:
