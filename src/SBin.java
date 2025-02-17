@@ -459,22 +459,17 @@ public class SBin {
 				// Ignore the first DATA element, probably it's some unique structure
 				List<SBinDataField> fields = new ArrayList<>();
 				SBinStruct struct = sbinJson.getStructs().get(structId);
-				if (struct == null) {continue;}
-				element.setStructName(struct.getName());
-//				int fieldsTakenSize = 0;
-				for (SBinField field : struct.getFieldsArray()) {
-					SBinDataField dataField = new SBinDataField();
-					dataField.setName(field.getName());
-					dataField.setType(field.getType());
-					dataField.setValue(getDataFieldValue(field, dataField, elementHex, sbinJson));
-					fields.add(dataField);
-//					fieldsTakenSize += field.getFieldSize();
+				if (struct != null) {
+					element.setStructName(struct.getName());
+					for (SBinField field : struct.getFieldsArray()) {
+						SBinDataField dataField = new SBinDataField();
+						dataField.setName(field.getName());
+						dataField.setType(field.getType());
+						processDataFieldValue(field, dataField, elementHex, sbinJson, element);
+						fields.add(dataField);
+					}
+					element.setFields(fields);
 				}
-//				if (fieldsTakenSize != elementHex.length) {
-//					element.setExtraHexValue(HEXUtils.hexToString( // +2 for struct header
-//							Arrays.copyOfRange(elementHex, fieldsTakenSize + 2, elementHex.length)));
-//				}
-				element.setFields(fields);
 			}
 			sbinDataElements.add(element);
 			blockElements.add(elementHex); // For internal use
@@ -484,14 +479,28 @@ public class SBin {
 		dataBlock.setBlockElements(blockElements);
 	}
 	
-	private String getDataFieldValue(SBinField field, SBinDataField dataField, byte[] elementHex, SBinJson sbinJson) {
-		// First two bytes is taken by Struct ID, start byte goes after it
+	private void processDataFieldValue(
+			SBinField field, SBinDataField dataField, byte[] elementHex, SBinJson sbinJson, SBinDataElement element) {
+		// First two bytes is taken by Struct ID, start byte goes after
 		int startOffset = field.getStartOffset() + 2;
-		int fieldRealSize = field.isDynamicSize() ? 
-				elementHex.length - startOffset : field.getFieldSize();
-		System.out.println("field: " + field.getName() + ", startOffset: " + field.getStartOffset() + ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize());
+		int fieldRealSize = field.getFieldSize();
+		if (field.isDynamicSize()) {
+			fieldRealSize = elementHex.length - startOffset;
+			int fieldStandardSize = SBinEnumUtils.getFieldStandardSize(field.getFieldTypeEnum());
+			
+			if (field.getFieldTypeEnum() != null && fieldStandardSize < fieldRealSize) {
+				int paddingSize = elementHex.length - startOffset - fieldStandardSize;
+				fieldRealSize -= paddingSize;
+				element.setExtraHexValue(HEXUtils.hexToString(
+						Arrays.copyOfRange(elementHex, startOffset + fieldRealSize, elementHex.length)));
+			} 
+		}
+		System.out.println("field: " + field.getName() + ", startOffset: " + field.getStartOffset() 
+				+ ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize());
+		
 		byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + fieldRealSize);
-		return SBinEnumUtils.formatFieldValueUnpack(field, dataField, fieldRealSize, valueHex, sbinJson);
+		dataField.setValue(
+				SBinEnumUtils.formatFieldValueUnpack(field, dataField, fieldRealSize, valueHex, sbinJson));
 	}
 	
 	private List<SBinCDATEntry> prepareCDATStrings(byte[] chdrBytes, byte[] cdatBytes) {
