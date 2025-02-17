@@ -1,6 +1,7 @@
 package util;
 
 import util.DataClasses.SBinDataField;
+import util.DataClasses.SBinField;
 import util.DataClasses.SBinJson;
 
 public class SBinEnumUtils {
@@ -11,6 +12,7 @@ public class SBinEnumUtils {
 	
 	public static int getFieldStandardSize(SBinFieldType type) {
 		int size = 0x0;
+		if (type == null) {return size;}
 		switch(type) {
 		case INT8:
 			size = 0x1;
@@ -26,13 +28,15 @@ public class SBinEnumUtils {
 		return size;
 	}
 	
-	public static String formatFieldValueUnpack(SBinFieldType type, SBinDataField dataField, int fieldRealSize, byte[] valueHex, SBinJson sbinJson) {
+	public static String formatFieldValueUnpack(
+			SBinField field, SBinDataField dataField, int fieldRealSize, byte[] valueHex, SBinJson sbinJson) {
 		String strValue;
-		if (getFieldStandardSize(type) != fieldRealSize) {
-			dataField.setForcedHexValue(true);
-			return getDefaultHEXString(valueHex);
+		// Try to handle int, boolean, float or CHDR ref with weird field size, but force last elements as a plain HEX to be safe
+		if (field.getFieldTypeEnum() == null ||
+				( getFieldStandardSize(field.getFieldTypeEnum()) != fieldRealSize && field.isDynamicSize()) ) {
+			return getDefaultHEXString(valueHex, dataField);
 		}
-		switch(type) {
+		switch(field.getFieldTypeEnum()) {
 		case INT32: case INT32_0X12: case INT32_0X16:
 			strValue = String.valueOf(HEXUtils.byteArrayToInt(valueHex));
 			break;
@@ -53,13 +57,14 @@ public class SBinEnumUtils {
 		case INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			// INT8: Primarily used for HEX colors, left as it is
 			// DATA_ID: simpler to provide HEX code and compare/find with other DATA info
-			strValue = getDefaultHEXString(valueHex);
+			strValue = getDefaultHEXString(valueHex, dataField);
 			break;
 		}
 		return strValue;
 	}
 	
-	private static String getDefaultHEXString(byte[] valueHex) {
+	private static String getDefaultHEXString(byte[] valueHex, SBinDataField dataField) {
+		dataField.setForcedHexValue(true);
 		return HEXUtils.hexToString(valueHex);
 	}
 }

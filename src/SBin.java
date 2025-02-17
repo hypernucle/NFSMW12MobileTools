@@ -130,6 +130,7 @@ public class SBin {
 			break;
 		default: break;
 		}
+		clearStructTypeEnums(sbinJson);
 		
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		String jsonOut = gson.toJson(sbinJson);
@@ -369,6 +370,16 @@ public class SBin {
 		return newCHDRId;
 	}
 	
+	private void clearStructTypeEnums(SBinJson sbinJson) {
+		for (SBinStruct struct : sbinJson.getStructs()) {
+			if (!struct.getFieldsArray().isEmpty()) {
+				for (SBinField field : struct.getFieldsArray()) {
+					field.setFieldTypeEnum(null);
+				}
+			}
+		}
+	}
+	
 	//
 	// SBin unpack functions
 	//
@@ -397,11 +408,11 @@ public class SBin {
 				String fieldEnumStr;
 				if (fieldObj.getFieldTypeEnum() == null) {
 					fieldEnumStr = "UNK_" + Integer.toHexString(type);
-					struct.setKnownTypes(false); // Do not parse DATA here - unknown entry size
+					// Do not parse DATA here - unknown entry size
 				} else {
 					fieldEnumStr = fieldObj.getFieldTypeEnum().toString();
-					fieldObj.setFieldSize(getFieldSize(i, fieldsCount, fieldObj.getStartOffset(), fielBlock, firstFieldId));
 				}
+				fieldObj.setFieldSize(getFieldSize(i, fieldsCount, fieldObj.getStartOffset(), fielBlock, firstFieldId));
 				fieldObj.setType(fieldEnumStr);
 				struct.addToFields(fieldObj);
 			}
@@ -412,6 +423,7 @@ public class SBin {
 	}
 	
 	// Fields can have a different sizes even for the same types, also there is no way to know about the size of last element
+	// And DATA elements have varied padding bytes sometimes
 	private int getFieldSize(int i, int fieldsCount, int startOffset, SBinBlockObj fielBlock, int firstFieldId) {
 		int nextFieldStartOffset = startOffset;
 		if (i + 1 < fieldsCount) {
@@ -440,14 +452,14 @@ public class SBin {
 			element.setOrderHexId(HEXUtils.hexToString(HEXUtils.shortToBytes(i)));
 			element.setOhdrUnkRemainder(elementOHDR - (elementBegin * 0x8));
 			ohdrPrevValue = elementBegin;
-			i++;
 			
 			int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
-			if (!sbinJson.getStructs().isEmpty() && structId < sbinJson.getStructs().size()) {
+			if (i > 0 && !sbinJson.getStructs().isEmpty() && structId != 0xF) {
 				// TODO Ignore map parsing at the moment
+				// Ignore the first DATA element, probably it's some unique structure
 				List<SBinDataField> fields = new ArrayList<>();
 				SBinStruct struct = sbinJson.getStructs().get(structId);
-				if (struct == null || !struct.isKnownTypes()) {continue;}
+				if (struct == null) {continue;}
 				element.setStructName(struct.getName());
 //				int fieldsTakenSize = 0;
 				for (SBinField field : struct.getFieldsArray()) {
@@ -466,6 +478,7 @@ public class SBin {
 			}
 			sbinDataElements.add(element);
 			blockElements.add(elementHex); // For internal use
+			i++;
 		}
 		sbinJson.setDataElements(sbinDataElements);
 		dataBlock.setBlockElements(blockElements);
@@ -478,7 +491,7 @@ public class SBin {
 				elementHex.length - startOffset : field.getFieldSize();
 		System.out.println("field: " + field.getName() + ", startOffset: " + field.getStartOffset() + ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize());
 		byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + fieldRealSize);
-		return SBinEnumUtils.formatFieldValueUnpack(field.getFieldTypeEnum(), dataField, fieldRealSize, valueHex, sbinJson);
+		return SBinEnumUtils.formatFieldValueUnpack(field, dataField, fieldRealSize, valueHex, sbinJson);
 	}
 	
 	private List<SBinCDATEntry> prepareCDATStrings(byte[] chdrBytes, byte[] cdatBytes) {

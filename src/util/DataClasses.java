@@ -360,8 +360,6 @@ public final class DataClasses {
 	public static class SBinStruct {
 		@SerializedName("Name")
 		private String name;
-		@SerializedName("KnownTypes")
-		private boolean knownTypes = true;
 		@SerializedName("Fields")
 		private List<SBinField> fieldsArray = new ArrayList<>();
 		
@@ -374,13 +372,6 @@ public final class DataClasses {
 		}
 		public void setName(String name) {
 			this.name = name;
-		}
-		
-		public boolean isKnownTypes() {
-			return knownTypes;
-		}
-		public void setKnownTypes(boolean knownTypes) {
-			this.knownTypes = knownTypes;
 		}
 
 		public List<SBinField> getFieldsArray() {
