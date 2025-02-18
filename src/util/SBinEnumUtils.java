@@ -38,6 +38,8 @@ public class SBinEnumUtils {
 		}
 		switch(field.getFieldTypeEnum()) {
 		case INT32: case ENUM_ID_INT32: case INT32_0X16:
+			// ENUM_ID_INT32: Enum stores all values on the last elements of DATA block, 
+			// so we read their values on other function.
 			strValue = String.valueOf(HEXUtils.byteArrayToInt(valueHex));
 			break;
 		case FLOAT:

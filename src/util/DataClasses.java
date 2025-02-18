@@ -367,11 +367,20 @@ public final class DataClasses {
 	}
 	
 	public static class SBinEnum {
+		@SerializedName("Id")
+		private int id;
 		@SerializedName("Name")
 		private String name;
 		@SerializedName("DataId_MapRef")
 		private String dataIdMapRef;
-
+		
+		public int getId() {
+			return id;
+		}
+		public void setId(int id) {
+			this.id = id;
+		}
+		
 		public String getName() {
 			return name;
 		}
@@ -417,6 +426,8 @@ public final class DataClasses {
 		private String name;
 		@SerializedName("Type")
 		private String type;
+		@SerializedName("Enum_JsonPreview")
+		private String enumJsonPreview;
 		@SerializedName("StartOffset")
 		private int startOffset;
 		@SerializedName("FieldSize")
@@ -440,6 +451,13 @@ public final class DataClasses {
 		}
 		public void setType(String type) {
 			this.type = type;
+		}
+		
+		public String getEnumJsonPreview() {
+			return enumJsonPreview;
+		}
+		public void setEnumJsonPreview(String enumJsonPreview) {
+			this.enumJsonPreview = enumJsonPreview;
 		}
 		
 		public int getStartOffset() {
@@ -489,10 +507,8 @@ public final class DataClasses {
 		private String extraHexValue;
 		@SerializedName("StructName")
 		private String structName;
-		@SerializedName("DataIDsMap")
-		private List<String> dataIdsMap;
-		@SerializedName("EnumMap")
-		private List<String> enumMap;
+		@SerializedName("MapElements")
+		private List<String> mapElements;
 		@SerializedName("Fields")
 		private List<SBinDataField> fields;
 		
@@ -531,18 +547,11 @@ public final class DataClasses {
 			this.structName = structName;
 		}
 		
-		public List<String> getDataIdsMap() {
-			return dataIdsMap;
+		public List<String> getMapElements() {
+			return mapElements;
 		}
-		public void setDataIdsMap(List<String> dataIdsMap) {
-			this.dataIdsMap = dataIdsMap;
-		}
-		
-		public List<String> getEnumMap() {
-			return enumMap;
-		}
-		public void setEnumMap(List<String> enumMap) {
-			this.enumMap = enumMap;
+		public void setMapElements(List<String> mapElements) {
+			this.mapElements = mapElements;
 		}
 		
 		public List<SBinDataField> getFields() {
@@ -558,6 +567,10 @@ public final class DataClasses {
 		private String name;
 		@SerializedName("Type")
 		private String type;
+		@SerializedName("Enum_JsonPreview")
+		private String enumJsonPreview;
+		@SerializedName("EnumDataMapId_JsonPreview")
+		private Long enumDataMapIdJsonPreview;
 		@SerializedName("ForcedHexValue")
 		private boolean forcedHexValue;
 		@SerializedName("Value")
@@ -575,6 +588,20 @@ public final class DataClasses {
 		}
 		public void setType(String type) {
 			this.type = type;
+		}
+		
+		public String getEnumJsonPreview() {
+			return enumJsonPreview;
+		}
+		public void setEnumJsonPreview(String enumJsonPreview) {
+			this.enumJsonPreview = enumJsonPreview;
+		}
+		
+		public Long getEnumDataMapIdJsonPreview() {
+			return enumDataMapIdJsonPreview;
+		}
+		public void setEnumDataMapIdJsonPreview(Long enumDataMapIdJsonPreview) {
+			this.enumDataMapIdJsonPreview = enumDataMapIdJsonPreview;
 		}
 		
 		public boolean isForcedHexValue() {
