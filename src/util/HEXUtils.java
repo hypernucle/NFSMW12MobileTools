@@ -54,6 +54,10 @@ public class HEXUtils {
 	public static float bytesToFloat(byte[] bytes) {
 		return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getFloat();
 	}
+	
+	public static byte[] floatToBytes(float value) {  
+	     return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putFloat(value).array();
+	}
 
 	// Taken from StackOverflow (maybeWeCouldStealAVan)
 	public static String hexToString(byte[] bytes) {
@@ -74,6 +78,10 @@ public class HEXUtils {
 					+ Character.digit(str.charAt(i+1), 16));
 		}
 		return data;
+	}
+	
+	public static byte[] stringToBytes(String str) {
+		return str.getBytes(StandardCharsets.UTF_8);
 	}
 
 	// https://stackoverflow.com/a/66638297

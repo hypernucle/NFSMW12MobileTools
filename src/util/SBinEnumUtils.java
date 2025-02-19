@@ -1,5 +1,8 @@
 package util;
 
+import java.util.List;
+
+import util.DataClasses.SBinCDATEntry;
 import util.DataClasses.SBinDataField;
 import util.DataClasses.SBinField;
 import util.DataClasses.SBinJson;
@@ -9,6 +12,8 @@ public class SBinEnumUtils {
 	//
 	// SBinFieldType
 	//
+	
+	private static final String UNK_PREFIX = "UNK_";
 	
 	public static int getFieldStandardSize(SBinFieldType type) {
 		int size = 0x0;
@@ -50,7 +55,7 @@ public class SBinEnumUtils {
 			if (valueInt < 2) { // Precaution in case of unknown value type
 				strValue = Boolean.toString(valueInt == 1);
 			} else {
-				strValue = String.valueOf(valueInt);
+				strValue = getDefaultHEXString(valueHex, dataField);
 			}
 			break;
 		case CHDR_ID_REF: 
@@ -65,8 +70,46 @@ public class SBinEnumUtils {
 		return strValue;
 	}
 	
+	public static byte[] convertValueByType(SBinFieldType type, SBinDataField dataField, List<SBinCDATEntry> cdatStrings) {
+		byte[] value = new byte[0];
+		switch(type) {
+		case INT32: case INT32_0X16:
+			value = HEXUtils.intToByteArrayLE(Integer.parseInt(dataField.getValue()), 0x4);
+			break;
+		case FLOAT:
+			value = HEXUtils.floatToBytes(Float.parseFloat(dataField.getValue()));
+			break;
+		case BOOLEAN: 
+			boolean bool = Boolean.parseBoolean(dataField.getValue());
+			int boolInt = bool ? 1 : 0;
+			value = HEXUtils.shortToBytes((short)boolInt);
+			break;
+		case CHDR_ID_REF: 
+			value = DataUtils.processStringInCDAT(cdatStrings, dataField.getValue());
+			break;
+		case ENUM_ID_INT32:
+			// TODO
+			break;
+		case INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
+			value = HEXUtils.decodeHexStr(dataField.getValue());
+			break;
+		}
+		return value;
+	}
+	
 	private static String getDefaultHEXString(byte[] valueHex, SBinDataField dataField) {
 		dataField.setForcedHexValue(true);
 		return HEXUtils.hexToString(valueHex);
+	}
+	
+	public static int getIdByStringName(String enumStr) {
+		String enumStrCheck = enumStr.startsWith(UNK_PREFIX) ? 
+				enumStr.substring(UNK_PREFIX.length(), enumStr.length()) : enumStr;
+		SBinFieldType type = SBinFieldType.valueOf(enumStrCheck);
+		if (type == null) { // Unknown type
+			return Integer.getInteger(enumStrCheck); 
+		} else {
+			return type.getId();
+		}
 	}
 }

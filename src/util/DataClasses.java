@@ -52,6 +52,8 @@ public final class DataClasses {
 		@SerializedName("BARG_HexEmptyBytesCount")
 		private Long bargHexEmptyBytesCount;
 		//
+		@SerializedName("EmptyFields")
+		private List<SBinField> emptyFields;
 		@SerializedName("Enums")
 		private List<SBinEnum> enums;
 		@SerializedName("Structs")
@@ -238,6 +240,13 @@ public final class DataClasses {
 			this.structs = structs;
 		}
 		
+		public List<SBinField> getEmptyFields() {
+			return emptyFields;
+		}
+		public void setEmptyFields(List<SBinField> emptyFields) {
+			this.emptyFields = emptyFields;
+		}
+		
 		public List<SBinCDATEntry> getCDATStrings() {
 			return cdatStrings;
 		}
@@ -397,6 +406,8 @@ public final class DataClasses {
 	}
 	
 	public static class SBinStruct {
+		@SerializedName("Id")
+		private int id;
 		@SerializedName("Name")
 		private String name;
 		@SerializedName("Fields")
@@ -404,6 +415,13 @@ public final class DataClasses {
 		
 		public void addToFields(SBinField field) {
 			this.fieldsArray.add(field);
+		}
+
+		public int getId() {
+			return id;
+		}
+		public void setId(int id) {
+			this.id = id;
 		}
 
 		public String getName() {
@@ -426,6 +444,8 @@ public final class DataClasses {
 		private String name;
 		@SerializedName("Type")
 		private String type;
+		@SerializedName("HexValue")
+		private String hexValue;
 		@SerializedName("Enum_JsonPreview")
 		private String enumJsonPreview;
 		@SerializedName("StartOffset")
@@ -451,6 +471,13 @@ public final class DataClasses {
 		}
 		public void setType(String type) {
 			this.type = type;
+		}
+		
+		public String getHexValue() {
+			return hexValue;
+		}
+		public void setHexValue(String hexValue) {
+			this.hexValue = hexValue;
 		}
 		
 		public String getEnumJsonPreview() {
@@ -507,6 +534,8 @@ public final class DataClasses {
 		private String extraHexValue;
 		@SerializedName("StructName")
 		private String structName;
+		@SerializedName("StructObject")
+		private boolean structObject = false;
 		@SerializedName("MapElements")
 		private List<String> mapElements;
 		@SerializedName("Fields")
@@ -545,6 +574,13 @@ public final class DataClasses {
 		}
 		public void setStructName(String structName) {
 			this.structName = structName;
+		}
+		
+		public boolean isStructObject() {
+			return structObject;
+		}
+		public void setStructObject(boolean structObject) {
+			this.structObject = structObject;
 		}
 		
 		public List<String> getMapElements() {

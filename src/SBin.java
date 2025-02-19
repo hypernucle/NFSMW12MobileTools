@@ -17,6 +17,7 @@ import com.google.gson.reflect.TypeToken;
 import util.FNV1;
 import util.SBinType;
 import util.DataClasses.*;
+import util.DataUtils;
 import util.HEXClasses.*;
 import util.HEXUtils;
 import util.SBinEnumUtils;
@@ -26,21 +27,41 @@ public class SBin {
 	
 	Gson gson = new Gson();
 	
-	private static final byte[] SBIN_HEADER = "SBIN".getBytes(StandardCharsets.UTF_8);
-	private static final byte[] ENUM_HEADER = "ENUM".getBytes(StandardCharsets.UTF_8);
-	private static final byte[] STRU_HEADER = "STRU".getBytes(StandardCharsets.UTF_8);
-	private static final byte[] FIEL_HEADER = "FIEL".getBytes(StandardCharsets.UTF_8);
-	private static final byte[] OHDR_HEADER = "OHDR".getBytes(StandardCharsets.UTF_8);
-	private static final byte[] DATA_HEADER = "DATA".getBytes(StandardCharsets.UTF_8);
-	private static final byte[] CHDR_HEADER = "CHDR".getBytes(StandardCharsets.UTF_8);
-	private static final byte[] CDAT_HEADER = "CDAT".getBytes(StandardCharsets.UTF_8);
+	private static final String SBIN_STR = "SBIN";
+	private static final byte[] SBIN_HEADER = HEXUtils.stringToBytes(SBIN_STR);
+	
+	private static final String ENUM_STR = "ENUM";
+	private static final byte[] ENUM_HEADER = HEXUtils.stringToBytes(ENUM_STR);
+	
+	private static final String STRU_STR = "STRU";
+	private static final byte[] STRU_HEADER = HEXUtils.stringToBytes(STRU_STR);
+	
+	private static final String FIEL_STR = "FIEL";
+	private static final byte[] FIEL_HEADER = HEXUtils.stringToBytes(FIEL_STR);
+	
+	private static final String OHDR_STR = "OHDR";
+	private static final byte[] OHDR_HEADER = HEXUtils.stringToBytes(OHDR_STR);
+	
+	private static final String DATA_STR = "DATA";
+	private static final byte[] DATA_HEADER = HEXUtils.stringToBytes(DATA_STR);
+	
+	private static final String CHDR_STR = "CHDR";
+	private static final byte[] CHDR_HEADER = HEXUtils.stringToBytes(CHDR_STR);
+	
+	private static final String CDAT_STR = "CDAT";
+	private static final byte[] CDAT_HEADER = HEXUtils.stringToBytes(CDAT_STR);
 	//
 	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
 	private static final int DDS_HEADER_SIZE = 0x80;
 	//
-	private static final byte[] BULK_HEADER = "BULK".getBytes(StandardCharsets.UTF_8);
-	private static final byte[] BARG_HEADER = "BARG".getBytes(StandardCharsets.UTF_8);
+	private static final String BULK_STR = "BULK";
+	private static final byte[] BULK_HEADER = HEXUtils.stringToBytes(BULK_STR);
+	
+	private static final String BARG_STR = "BARG";
+	private static final byte[] BARG_HEADER = HEXUtils.stringToBytes(BARG_STR);
+	
 	//
+	private static final byte[] SHORT_EMPTYBYTES = new byte[2];
 	private static final int DATA_COMMONBYTES = 0x24;
 	private static final int CAREER_DATA_COMMONBYTES = 0x80;
 	private static final int CAREER_OHDR_COMMONBYTES = 0x2C;
@@ -55,6 +76,8 @@ public class SBin {
 	//
 	private static final String DATA_IDS_MAP_STRUCTNAME = "DataIdsMap";
 	private static final String ENUM_MAP_STRUCTNAME = "EnumMap";
+	private static final String FIRST_DATA_STRUCTNAME = "FirstDATAElement";
+	private static final String HEX_DATA_TYPE = "HEXData";
 	private static final int DATA_IDS_MAP_SKIPBYTES = 0x8;
 	private static final int DATA_IDS_MAP_STRUCTID = 0xF;
 	private static final int ENUM_MAP_STRUCTID = 0xD;
@@ -151,18 +174,18 @@ public class SBin {
 		reader.close();
 		sbinJsonObj.setSBinType(sbinJsonObj.getSBinType());
 
-		// ENUM (Not enough info)
-		SBinBlockObj enumBlock = createSBinBlock(sbinJsonObj.getENUMHexStr(), ENUM_HEADER);
+		// ENUM
+		SBinBlockObj enumBlock = createSBinBlock(sbinJsonObj, ENUM_HEADER);
 		enumBlock.setBlockEmptyBytesCount(sbinJsonObj.getENUMHexEmptyBytesCount().intValue());
 		byte[] finalENUM = buildSBinBlock(enumBlock);
-		// STRU (Not enough info)
-		SBinBlockObj struBlock = createSBinBlock(sbinJsonObj.getSTRUHexStr(), STRU_HEADER);
+		// STRU & FIEL
+		SBinBlockObj struBlock = new SBinBlockObj();
+		SBinBlockObj fielBlock = new SBinBlockObj();
+		createSTRUFIELBlocks(sbinJsonObj, struBlock, fielBlock);
 		struBlock.setBlockEmptyBytesCount(sbinJsonObj.getSTRUHexEmptyBytesCount().intValue());
-		byte[] finalSTRU = buildSBinBlock(struBlock);
-		// FIEL (Not enough info)
-		SBinBlockObj fielBlock = createSBinBlock(sbinJsonObj.getFIELHexStr(), FIEL_HEADER);
 		fielBlock.setBlockEmptyBytesCount(sbinJsonObj.getFIELHexEmptyBytesCount().intValue());
 		byte[] finalFIEL = buildSBinBlock(fielBlock);
+		byte[] finalSTRU = buildSBinBlock(struBlock);
 		// DATA & OHDR
 		SBinBlockObj dataBlock = createDATABlock(sbinJsonObj, DATA_HEADER);
 		dataBlock.setBlockEmptyBytesCount(sbinJsonObj.getDATAHexEmptyBytesCount().intValue());
@@ -183,7 +206,7 @@ public class SBin {
 		ByteArrayOutputStream additionalBlocksStream = new ByteArrayOutputStream();
 		if (sbinJsonObj.getSBinType() == SBinType.TEXTURE) {
 			// BULK (Partial info)
-			SBinBlockObj bulkBlock = createSBinBlock(sbinJsonObj.getBULKHexStr(), BULK_HEADER);
+			SBinBlockObj bulkBlock = createSBinBlock(sbinJsonObj, BULK_HEADER);
 			bulkBlock.setBlockEmptyBytesCount(sbinJsonObj.getBULKHexEmptyBytesCount().intValue());
 			byte[] finalBULK = buildSBinBlock(bulkBlock);
 			additionalBlocksStream.write(finalBULK);
@@ -298,15 +321,89 @@ public class SBin {
 		return block;
 	}
 
-	private SBinBlockObj createSBinBlock(String hexStr, byte[] header) {
+	private SBinBlockObj createSBinBlock(SBinJson sbinJson, byte[] header) throws IOException {
 		SBinBlockObj block = new SBinBlockObj();
 		block.setHeader(header);
-		block.setBlockBytes(HEXUtils.decodeHexStr(hexStr));
-		block.setFnv1Hash(HEXUtils.intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
-		if (block.getBlockBytes().length != 0) {
-			block.setBlockSize(HEXUtils.intToByteArrayLE(block.getBlockBytes().length, 0x4));
+		
+		String headerStr = HEXUtils.hexToString(header);
+		switch(headerStr) {
+		case ENUM_STR:
+			block.setBlockBytes(createENUMBlockBytes(sbinJson));
+			break;
+		case OHDR_STR:
+			break;
+		case DATA_STR:
+			break;
+		case CHDR_STR:
+			break;
+		case CDAT_STR:
+			break;
+		case BULK_STR:
+			block.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getBULKHexStr()));
+			break;
+		case BARG_STR:
+			break;
+		default: 
+			block.setBlockBytes(new byte[0]);
+			break;
 		}
+		
+		setSBinBlockAttributes(block);
 		return block;
+	}
+	
+	private byte[] createENUMBlockBytes(SBinJson sbinJson) throws IOException {
+		ByteArrayOutputStream enumHexStream = new ByteArrayOutputStream();
+		if (sbinJson.getEnums() == null) {
+			enumHexStream.write(HEXUtils.decodeHexStr(sbinJson.getENUMHexStr()));
+		} else for (SBinEnum enumEntry : sbinJson.getEnums()) {
+			enumHexStream.write(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), enumEntry.getName()));
+			enumHexStream.write(SHORTBYTE_EMPTY);
+			enumHexStream.write(HEXUtils.decodeHexStr(enumEntry.getDataIdMapRef()));
+			enumHexStream.write(SHORTBYTE_EMPTY);
+		} 
+		return enumHexStream.toByteArray();
+	}
+	
+	private void createSTRUFIELBlocks(SBinJson sbinJson, SBinBlockObj struBlock, SBinBlockObj fielBlock) throws IOException {
+		struBlock.setHeader(STRU_HEADER);
+		fielBlock.setHeader(FIEL_HEADER);
+		
+		if (sbinJson.getStructs().isEmpty()) {
+			struBlock.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getSTRUHexStr()));
+			fielBlock.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getFIELHexStr()));
+		} else {
+			ByteArrayOutputStream struHexStream = new ByteArrayOutputStream();
+			ByteArrayOutputStream fielHexStream = new ByteArrayOutputStream();
+			int fieldId = 0;
+			// Place "empty" fields first
+			for (SBinField emptyFld : sbinJson.getEmptyFields()) {
+				fielHexStream.write(HEXUtils.decodeHexStr(emptyFld.getHexValue()));
+				fieldId++;
+			}
+			for (SBinStruct struct : sbinJson.getStructs()) {
+				struHexStream.write(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), struct.getName()));
+				boolean isFirstField = false;
+				for (SBinField field : struct.getFieldsArray()) {
+					if (!isFirstField) {
+						struHexStream.write(HEXUtils.shortToBytes((short)fieldId));
+						isFirstField = true;
+					}
+					fielHexStream.write(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), field.getName()));
+					fielHexStream.write(HEXUtils.shortToBytes(
+							(short)SBinEnumUtils.getIdByStringName(field.getType())));
+					fielHexStream.write(HEXUtils.shortToBytes((short)field.getStartOffset()));
+					fielHexStream.write(HEXUtils.shortToBytes((short)field.getSpecOrderId()));
+					fieldId++;
+				}
+				struHexStream.write(HEXUtils.shortToBytes((short)struct.getFieldsArray().size()));
+			}
+			struBlock.setBlockBytes(struHexStream.toByteArray());
+			fielBlock.setBlockBytes(fielHexStream.toByteArray());
+		} 
+		
+		setSBinBlockAttributes(struBlock);
+		setSBinBlockAttributes(fielBlock);
 	}
 
 	private byte[] buildSBinBlock(SBinBlockObj block) throws IOException {
@@ -365,75 +462,74 @@ public class SBin {
 		return cdatStrings.get(hexCHDRId).getString();
 	}
 	
-	private byte[] processStringInCDAT(List<SBinCDATEntry> cdatList, String string) {
-		for (SBinCDATEntry cdatEntry : cdatList) {
-			if (cdatEntry.getString().contentEquals(string)) {
-				return HEXUtils.decodeHexStr(cdatEntry.getChdrHexId());
-			}
-		}
-		byte[] newCHDRId = HEXUtils.shortToBytes(cdatList.size());
-		SBinCDATEntry newEntry = new SBinCDATEntry();
-		newEntry.setString(string);
-		newEntry.setChdrHexId(HEXUtils.hexToString(newCHDRId));
-		cdatList.add(newEntry);
-		return newCHDRId;
-	}
-	
-	private void clearStructTypeEnums(SBinJson sbinJson) {
-		for (SBinStruct struct : sbinJson.getStructs()) {
-			if (!struct.getFieldsArray().isEmpty()) {
-				for (SBinField field : struct.getFieldsArray()) {
-					field.setFieldTypeEnum(null);
-				}
-			}
-		}
-	}
-	
 	//
-	// SBin unpack functions
+	// SBin object-related functions
 	//
 	
 	private void readStructsAndFields(SBinJson sbinJson, SBinBlockObj struBlock, SBinBlockObj fielBlock) {
 		if (sbinJson.getSBinType() != SBinType.COMMON || struBlock.getBlockSizeInt() == 0
 				|| fielBlock.getBlockSizeInt() == 0) {return;}
 		
+		int firstReadableField = 0;
+		int id = 0;
 		for (byte[] structBytes : struBlock.getBlockElements()) {
 			SBinStruct struct = new SBinStruct();
+			struct.setId(id);
 			struct.setName(
 					getCDATStringByShortCHDRId(structBytes, 0, 2, sbinJson.getCDATStrings()));
 			
 			int firstFieldId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 2, 4));
 			int fieldsCount = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 4, 6));
-			for (int i = 0; i < fieldsCount; i++) {
-				byte[] fieldHex = fielBlock.getBlockElements().get(firstFieldId + i);
-				SBinField fieldObj = new SBinField();
-				fieldObj.setName(
-						getCDATStringByShortCHDRId(fieldHex, 0, 2, sbinJson.getCDATStrings()));
-				fieldObj.setStartOffset(HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 4, 6)));
-				// this order ID could be used for Enum IDs, and in Maps for some reason
-				fieldObj.setSpecOrderId(HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 6, 8)));
-				int type = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 2, 4));
-				
-				fieldObj.setFieldTypeEnum(SBinFieldType.valueOf(type));
-				String fieldEnumStr;
-				if (fieldObj.getFieldTypeEnum() == null) {
-					fieldEnumStr = "UNK_" + Integer.toHexString(type);
-					// Do not parse DATA here - unknown entry size
-				} else {
-					fieldEnumStr = fieldObj.getFieldTypeEnum().toString();
-				}
-				fieldObj.setFieldSize(getFieldSize(i, fieldsCount, fieldObj.getStartOffset(), fielBlock, firstFieldId));
-				fieldObj.setType(fieldEnumStr);
-				
-				if (fieldObj.getFieldTypeEnum().equals(SBinFieldType.ENUM_ID_INT32)) {
-					fieldObj.setEnumJsonPreview(sbinJson.getEnums().get(fieldObj.getSpecOrderId()).getName());
-				}
-				struct.addToFields(fieldObj);
+			if (firstReadableField == 0 && firstFieldId > 0) {
+				firstReadableField = firstFieldId; // Read these unknown fields later
 			}
-			
+			for (int i = 0; i < fieldsCount; i++) {
+				struct.addToFields(readField(sbinJson, fielBlock, i, firstFieldId, fieldsCount));
+			}
 			struct.getFieldsArray().get(struct.getFieldsArray().size() - 1).setDynamicSize(true);
 			sbinJson.addStruct(struct);
+			id++;
 		}
+		if (firstReadableField != 0) {
+			List<SBinField> emptyFields = new ArrayList<>();
+			for (int i = 0; i < firstReadableField; i++) {
+				emptyFields.add(readField(sbinJson, fielBlock, i, 0, 0));
+			}
+			sbinJson.setEmptyFields(emptyFields);
+		}
+ 	}
+	
+	private SBinField readField(SBinJson sbinJson, SBinBlockObj fielBlock, int i, int firstFieldId, int fieldsCount) {
+		byte[] fieldHex = fielBlock.getBlockElements().get(firstFieldId + i);
+		SBinField fieldObj = new SBinField();
+		
+		int nameCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 0, 2));
+		fieldObj.setName(sbinJson.getCDATStrings().get(nameCHDRId).getString());
+		fieldObj.setStartOffset(HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 4, 6)));
+		if (nameCHDRId == 0) {
+			fieldObj.setHexValue(HEXUtils.hexToString(fielBlock.getBlockElements().get(i)));
+		}
+		
+		// this order ID could be used for Enum IDs, and in Maps for some reason
+		fieldObj.setSpecOrderId(HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 6, 8)));
+		int type = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(fieldHex, 2, 4));
+		
+		fieldObj.setFieldTypeEnum(SBinFieldType.valueOf(type));
+		String fieldEnumStr;
+		if (fieldObj.getFieldTypeEnum() == null) {
+			fieldEnumStr = "UNK_" + Integer.toHexString(type);
+			// Do not parse DATA here - unknown entry size
+		} else {
+			fieldEnumStr = fieldObj.getFieldTypeEnum().toString();
+		}
+		fieldObj.setFieldSize(getFieldSize(i, fieldsCount, fieldObj.getStartOffset(), fielBlock, firstFieldId));
+		fieldObj.setType(fieldEnumStr);
+		
+		if (fieldObj.getFieldTypeEnum() != null 
+				&& fieldObj.getFieldTypeEnum().equals(SBinFieldType.ENUM_ID_INT32)) {
+			fieldObj.setEnumJsonPreview(sbinJson.getEnums().get(fieldObj.getSpecOrderId()).getName());
+		}
+		return fieldObj;
 	}
 	
 	// Fields can have a different sizes even for the same types, also there is no way to know about the size of last element
@@ -480,12 +576,15 @@ public class SBin {
 		int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
 		if (structId == DATA_IDS_MAP_STRUCTID || structId == ENUM_MAP_STRUCTID) {
 			processDataMap(elementHex, element, structId, sbinJson.getCDATStrings());
-		} else if (i > 0 && !sbinJson.getStructs().isEmpty() && sbinJson.getStructs().size() > structId) {
-			// Ignore the first DATA element, probably it's some unique structure
+		} else if (i == 0) {
+			// The first DATA element is probably some unique structure, but we parse it too since it contains one of CDAT strings
+			processFirstDATAEntry(elementHex, element, sbinJson.getCDATStrings());
+		} else if (!sbinJson.getStructs().isEmpty() && sbinJson.getStructs().size() > structId) {
 			List<SBinDataField> fields = new ArrayList<>();
 			SBinStruct struct = sbinJson.getStructs().get(structId);
 			if (struct != null) {
 				element.setStructName(struct.getName());
+				element.setStructObject(true); // Struct from SBin file itself
 				for (SBinField field : struct.getFieldsArray()) {
 					SBinDataField dataField = new SBinDataField();
 					dataField.setName(field.getName());
@@ -521,6 +620,32 @@ public class SBin {
 				? DATA_IDS_MAP_STRUCTNAME : ENUM_MAP_STRUCTNAME);
 		element.setExtraHexValue(HEXUtils.hexToString(
 				Arrays.copyOfRange(elementHex, bytesTaken, elementHex.length)));
+	}
+	
+	private void processFirstDATAEntry(byte[] elementHex, SBinDataElement element, List<SBinCDATEntry> cdatStrings) {
+		element.setStructName(FIRST_DATA_STRUCTNAME);
+		List<SBinDataField> fields = new ArrayList<>();
+		
+		SBinDataField hex1 = new SBinDataField();
+		hex1.setName("HEXData_Part1");
+		hex1.setType(HEX_DATA_TYPE);
+		hex1.setValue(HEXUtils.hexToString(Arrays.copyOfRange(elementHex, 0, 4)));
+		hex1.setForcedHexValue(true);
+		fields.add(hex1);
+		
+		SBinDataField cdatString = new SBinDataField();
+		cdatString.setName("CDATString");
+		cdatString.setType("CHDR_ID_REF");
+		cdatString.setValue(getCDATStringByShortCHDRId(elementHex, 4, 6, cdatStrings));
+		fields.add(cdatString);
+		
+		SBinDataField hex2 = new SBinDataField();
+		hex2.setName("HEXData_Part2");
+		hex2.setType(HEX_DATA_TYPE);
+		hex2.setValue(HEXUtils.hexToString(Arrays.copyOfRange(elementHex, 6, elementHex.length)));
+		hex2.setForcedHexValue(true);
+		fields.add(hex2);
+		element.setFields(fields);
 	}
 	
 	private void processDataFieldValue(
@@ -589,6 +714,32 @@ public class SBin {
 				dataField.getEnumDataMapIdJsonPreview().intValue()).getMapElements().get(enumElementId));
 		dataField.setEnumDataMapIdJsonPreview(null);
 	}
+	
+	private void clearStructTypeEnums(SBinJson sbinJson) {
+		for (SBinStruct struct : sbinJson.getStructs()) {
+			if (!struct.getFieldsArray().isEmpty()) {
+				for (SBinField field : struct.getFieldsArray()) {
+					field.setFieldTypeEnum(null);
+				}
+			}
+		}
+		for (SBinField emptyField : sbinJson.getEmptyFields()) {
+			emptyField.setFieldTypeEnum(null);
+		}
+	}
+	
+	private SBinStruct getStructObject(SBinJson sbinJson, String structName) {
+		for (SBinStruct struct : sbinJson.getStructs()) {
+			if (struct.getName().contentEquals(structName)) {
+				return struct;
+			}
+		}
+		throw new NullPointerException("!!! One of DATA elements contains wrong referenced Struct.");
+	}
+	
+	//
+	// SBin unpack functions
+	//
 	
 	private List<SBinCDATEntry> prepareCDATStrings(byte[] chdrBytes, byte[] cdatBytes) {
 		List<byte[]> chdrEntries = HEXUtils.splitByteArray(chdrBytes, 0x8);
@@ -862,8 +1013,47 @@ public class SBin {
 		
 		ByteArrayOutputStream dataHexStream = new ByteArrayOutputStream();
 		for (SBinDataElement dataEntry : sbinJson.getDataElements()) {
-			byte[] dataEntryHex = HEXUtils.decodeHexStr(dataEntry.getHexValue());
+			ByteArrayOutputStream dataElementStream = new ByteArrayOutputStream();
+			// Unknown object or other stuff represented as HEX array
+			if (dataEntry.getFields() == null && dataEntry.getMapElements() == null) {
+				dataElementStream.write(HEXUtils.decodeHexStr(dataEntry.getHexValue()));
+			} 
+			else if (dataEntry.isStructObject()) { // Object from SBin
+				SBinStruct struct = getStructObject(sbinJson, dataEntry.getStructName());
+				dataElementStream.write(HEXUtils.shortToBytes((short)struct.getId()));
+				//
+				for (SBinDataField dataField : dataEntry.getFields()) {
+					dataElementStream.write(fieldValueToBytes(dataField, struct, sbinJson.getCDATStrings()));
+				}
+			} 
+			else if (dataEntry.getStructName().contentEquals(FIRST_DATA_STRUCTNAME)) {
+				for (SBinDataField dataField : dataEntry.getFields()) {
+					dataElementStream.write(dataField.getType().contentEquals(HEX_DATA_TYPE)
+							? HEXUtils.decodeHexStr(dataField.getValue())
+							: DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), dataField.getValue()));
+				}
+			}
+			else { // Map or Enum
+				int structId = dataEntry.getStructName().contentEquals(DATA_IDS_MAP_STRUCTNAME) 
+						? DATA_IDS_MAP_STRUCTID : ENUM_MAP_STRUCTID;
+				dataElementStream.write(HEXUtils.intToByteArrayLE(structId, 0x4));
+				dataElementStream.write(HEXUtils.intToByteArrayLE(dataEntry.getMapElements().size(), 0x4));
+				boolean isEnumMap = structId == ENUM_MAP_STRUCTID;
+				for (String mapEntry : dataEntry.getMapElements()) {
+					if (isEnumMap) {
+						DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), mapEntry);
+					} else {
+						dataElementStream.write(HEXUtils.decodeHexStr(mapEntry));
+						dataElementStream.write(SHORT_EMPTYBYTES);
+					}
+				}
+			}
+			if (dataEntry.getExtraHexValue() != null) {
+				dataElementStream.write(HEXUtils.decodeHexStr(dataEntry.getExtraHexValue()));
+			}
+			byte[] dataEntryHex = dataElementStream.toByteArray();
 			dataHexStream.write(dataEntryHex);
+			//System.out.println("id: " + dataEntry.getOrderHexId() + ", length: " + dataEntryHex.length + ", bytes: " + HEXUtils.hexToString(dataEntryHex));
 			block.addToOHDRMapTemplate(dataEntryHex.length, dataEntry.getOhdrUnkRemainder());
 		} // Save common or unknown DATA info
 		
@@ -886,6 +1076,27 @@ public class SBin {
 		
 		setSBinBlockAttributes(block);
 		return block;
+	}
+	
+	private byte[] fieldValueToBytes(SBinDataField dataField, SBinStruct struct, List<SBinCDATEntry> cdatStrings) throws IOException {
+		ByteArrayOutputStream dataFieldStream = new ByteArrayOutputStream();
+		if (dataField.isForcedHexValue()) {
+			dataFieldStream.write(HEXUtils.decodeHexStr(dataField.getValue()));
+		} else { // Non-HEX value here means that we know it's type
+			SBinFieldType valueType = SBinFieldType.valueOf(dataField.getType());
+			int fieldRealSize = SBinEnumUtils.getFieldStandardSize(valueType); //
+			for (SBinField field : struct.getFieldsArray()) {
+				if (field.getName().contentEquals(dataField.getType())) {
+					fieldRealSize = field.getFieldSize();
+				}
+			}
+			byte[] convertedValue = SBinEnumUtils.convertValueByType(valueType, dataField, cdatStrings);
+			dataFieldStream.write(convertedValue);
+			if (convertedValue.length != fieldRealSize) {
+				dataFieldStream.write(new byte[fieldRealSize - convertedValue.length]);
+			} // TODO broken for some reason
+		}
+		return dataFieldStream.toByteArray();
 	}
 	
 	// Very primitive
@@ -965,15 +1176,15 @@ public class SBin {
 			
 			SBinAchievementEntryHex achiHex = new SBinAchievementEntryHex();
 			achiHex.setOhdrUnkRemainder(achievement.getOhdrUnkRemainder());
-			achiHex.setName(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getName()));
-			achiHex.setDesc(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getDesc()));
+			achiHex.setName(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), achievement.getName()));
+			achiHex.setDesc(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), achievement.getDesc()));
 			achiHex.setPoints(HEXUtils.intToByteArrayLE(achievement.getPointsInt(), 0x4));
-			achiHex.setAutologAwardId(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getAutologAwardId()));
+			achiHex.setAutologAwardId(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), achievement.getAutologAwardId()));
 			achiHex.setCategoryId(HEXUtils.intToByteArrayLE(achievement.getCategoryId(), 0x4));
 			achiHex.setMetricId(HEXUtils.intToByteArrayLE(achievement.getMetricId(), 0x4));
 			achiHex.setMetricTarget(HEXUtils.intToByteArrayLE(achievement.getMetricTargetInt(), 0x4));
-			achiHex.setImageName(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getImageName()));
-			achiHex.setImageText(processStringInCDAT(sbinJson.getCDATStrings(), achievement.getImageText()));
+			achiHex.setImageName(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), achievement.getImageName()));
+			achiHex.setImageText(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), achievement.getImageText()));
 			achiHex.setOrderId(HEXUtils.shortToBytes((short)orderId));
 			
 			SBinStructureEntryHex structure = new SBinStructureEntryHex();
@@ -1030,7 +1241,7 @@ public class SBin {
 			playlistHex.setOhdrStruRemainder(playlist.getOhdrStruRemainder());
 			playlistHex.setHeader(HEXUtils.shortToBytes((short)0x2));
 			playlistHex.setUnkHex1(PLAYLISTS_DATA_DESC_UNK1);
-			playlistHex.setName(processStringInCDAT(sbinJson.getCDATStrings(), playlist.getName()));
+			playlistHex.setName(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), playlist.getName()));
 			playlistHex.setUnkHex2(PLAYLISTS_DATA_DESC_UNK2);
 			playlistHex.setOrderId(HEXUtils.shortToBytes((short)orderId));
 			
@@ -1050,11 +1261,11 @@ public class SBin {
 				trackEntry.setOhdrUnkRemainder(track.getOhdrUnkRemainder());
 				trackEntry.setHeader(HEXUtils.shortToBytes((short)0x3));
 				trackEntry.setUnkHex1(PLAYLISTS_DATA_TRACK_UNK1);
-				trackEntry.setFilePath(processStringInCDAT(sbinJson.getCDATStrings(), track.getFilePath()));
+				trackEntry.setFilePath(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), track.getFilePath()));
 				trackEntry.setUnkHex2(PLAYLISTS_DATA_TRACK_UNK2);
-				trackEntry.setArtist(processStringInCDAT(sbinJson.getCDATStrings(), track.getArtist()));
+				trackEntry.setArtist(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), track.getArtist()));
 				trackEntry.setUnkHex3(PLAYLISTS_DATA_TRACK_UNK3);
-				trackEntry.setTitle(processStringInCDAT(sbinJson.getCDATStrings(), track.getTitle()));
+				trackEntry.setTitle(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), track.getTitle()));
 				playlistHex.addToPlaylistTracks(trackEntry);
 				orderId++;
 			}
