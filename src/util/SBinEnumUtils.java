@@ -1,9 +1,7 @@
 package util;
 
-import java.util.List;
-
-import util.DataClasses.SBinCDATEntry;
 import util.DataClasses.SBinDataField;
+import util.DataClasses.SBinEnum;
 import util.DataClasses.SBinField;
 import util.DataClasses.SBinJson;
 
@@ -50,8 +48,8 @@ public class SBinEnumUtils {
 		case FLOAT:
 			strValue = String.valueOf(HEXUtils.bytesToFloat(valueHex));
 			break;
-		case BOOLEAN: 
-			int valueInt = HEXUtils.twoLEByteArrayToInt(valueHex);
+		case BOOLEAN: // Boolean sizes can be really different
+			int valueInt = valueHex.length == 1 ? valueHex[0] : HEXUtils.twoLEByteArrayToInt(valueHex);
 			if (valueInt < 2) { // Precaution in case of unknown value type
 				strValue = Boolean.toString(valueInt == 1);
 			} else {
@@ -70,7 +68,8 @@ public class SBinEnumUtils {
 		return strValue;
 	}
 	
-	public static byte[] convertValueByType(SBinFieldType type, SBinDataField dataField, List<SBinCDATEntry> cdatStrings) {
+	public static byte[] convertValueByType(
+			SBinFieldType type, SBinDataField dataField, SBinJson sbinJson, int fieldRealSize) {
 		byte[] value = new byte[0];
 		switch(type) {
 		case INT32: case INT32_0X16:
@@ -83,12 +82,15 @@ public class SBinEnumUtils {
 			boolean bool = Boolean.parseBoolean(dataField.getValue());
 			int boolInt = bool ? 1 : 0;
 			value = HEXUtils.shortToBytes((short)boolInt);
+			if (fieldRealSize == 1) {
+				value = new byte[]{value[0]};
+			} 
 			break;
 		case CHDR_ID_REF: 
-			value = DataUtils.processStringInCDAT(cdatStrings, dataField.getValue());
+			value = DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), dataField.getValue());
 			break;
 		case ENUM_ID_INT32:
-			// TODO
+			value = getEnumValueBytes(sbinJson, dataField);
 			break;
 		case INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			value = HEXUtils.decodeHexStr(dataField.getValue());
@@ -103,13 +105,31 @@ public class SBinEnumUtils {
 	}
 	
 	public static int getIdByStringName(String enumStr) {
-		String enumStrCheck = enumStr.startsWith(UNK_PREFIX) ? 
+		boolean isUnknownType = enumStr.startsWith(UNK_PREFIX);
+		String enumStrCheck = isUnknownType ? 
 				enumStr.substring(UNK_PREFIX.length(), enumStr.length()) : enumStr;
-		SBinFieldType type = SBinFieldType.valueOf(enumStrCheck);
-		if (type == null) { // Unknown type
-			return Integer.getInteger(enumStrCheck); 
+		if (isUnknownType) { 
+			return Integer.decode(enumStrCheck); 
 		} else {
-			return type.getId();
+			return SBinFieldType.valueOf(enumStrCheck).getId();
 		}
+	}
+	
+	private static byte[] getEnumValueBytes(SBinJson sbinJson, SBinDataField dataField) {
+		int enumMapId = 0;
+		for (SBinEnum enumObj : sbinJson.getEnums()) {
+			if (enumObj.getName().contentEquals(dataField.getEnumJsonPreview())) {
+				enumMapId = HEXUtils.twoLEByteArrayToInt(
+						HEXUtils.decodeHexStr(enumObj.getDataIdMapRef()));
+			}
+		}
+		int i = 0;
+		for (String mapElement : sbinJson.getDataElements().get(enumMapId).getMapElements()) {
+			if (mapElement.contentEquals(dataField.getValue())) {
+				return HEXUtils.intToByteArrayLE(i, 0x4);
+			}
+			i++;
+		}
+		return new byte[2];
 	}
 }

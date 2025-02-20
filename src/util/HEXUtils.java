@@ -83,6 +83,10 @@ public class HEXUtils {
 	public static byte[] stringToBytes(String str) {
 		return str.getBytes(StandardCharsets.UTF_8);
 	}
+	
+	public static String UTF8BytesToString(byte[] value) {
+		return new String(value, StandardCharsets.UTF_8);
+	}
 
 	// https://stackoverflow.com/a/66638297
 	public static List<byte[]> splitByteArray(byte[] array, int chunkSize) {

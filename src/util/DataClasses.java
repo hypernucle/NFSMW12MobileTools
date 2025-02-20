@@ -463,6 +463,8 @@ public final class DataClasses {
 		private int fieldSize = 0;
 		@SerializedName("DynamicSize")
 		private boolean dynamicSize = false;
+		@SerializedName("RepeatFieldFromNextStruct")
+		private boolean repeatFieldFromNextStruct = false;
 		@SerializedName("SpecOrderId")
 		private int specOrderId = 0;
 		
@@ -515,6 +517,13 @@ public final class DataClasses {
 		}
 		public void setDynamicSize(boolean dynamicSize) {
 			this.dynamicSize = dynamicSize;
+		}
+		
+		public boolean isRepeatFieldFromNextStruct() {
+			return repeatFieldFromNextStruct;
+		}
+		public void setRepeatFieldFromNextStruct(boolean repeatFieldFromNextStruct) {
+			this.repeatFieldFromNextStruct = repeatFieldFromNextStruct;
 		}
 		
 		public int getSpecOrderId() {
