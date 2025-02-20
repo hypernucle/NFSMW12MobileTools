@@ -51,6 +51,8 @@ public final class DataClasses {
 		private String bargHexStr;
 		@SerializedName("BARG_HexEmptyBytesCount")
 		private Long bargHexEmptyBytesCount;
+		@SerializedName("CDAT_AllStringsFromDATA")
+		private boolean cdatAllStringsFromData = true;
 		//
 		@SerializedName("EmptyFields")
 		private List<SBinField> emptyFields;
@@ -218,6 +220,13 @@ public final class DataClasses {
 		}
 		public void setBARGHexEmptyBytesCount(Long bargHexEmptyBytesCount) {
 			this.bargHexEmptyBytesCount = bargHexEmptyBytesCount;
+		}
+		
+		public boolean isCDATAllStringsFromDATA() {
+			return cdatAllStringsFromData;
+		}
+		public void setCDATAllStringsFromDATA(boolean cdatAllStringsFromData) {
+			this.cdatAllStringsFromData = cdatAllStringsFromData;
 		}
 		
 		//

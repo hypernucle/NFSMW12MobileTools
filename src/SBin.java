@@ -161,7 +161,7 @@ public class SBin {
 			break;
 		default: break;
 		}
-		clearStructTypeEnums(sbinJson);
+		clearJsonOutputStuff(sbinJson);
 		
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		String jsonOut = gson.toJson(sbinJson);
@@ -552,33 +552,39 @@ public class SBin {
 		
 		int ohdrPrevValue = 0;
 		int i = 0;
+		boolean isAllObjectsKnown = true;
 		for (byte[] ohdrPos : ohdrPosDataBytes) {
 			SBinDataElement element = new SBinDataElement();
 			int elementOHDR = HEXUtils.byteArrayToInt(ohdrPos);
 			int elementBegin = elementOHDR / 0x8;
 			
 			byte[] elementHex = Arrays.copyOfRange(dataBlock.getBlockBytes(), ohdrPrevValue, elementBegin);
-			element.setHexValue(HEXUtils.hexToString(elementHex).toUpperCase());
 			element.setOrderHexId(HEXUtils.hexToString(HEXUtils.shortToBytes(i)));
 			element.setOhdrUnkRemainder(elementOHDR - (elementBegin * 0x8));
 			ohdrPrevValue = elementBegin;
 			
-			parseDATAFields(elementHex, sbinJson, i, element);
+			if (isAllObjectsKnown && !parseDATAFields(elementHex, sbinJson, i, element)) {
+				isAllObjectsKnown = false;
+			}
 			sbinDataElements.add(element);
 			blockElements.add(elementHex); // For internal use
 			i++;
 		}
+		sbinJson.setCDATAllStringsFromDATA(isAllObjectsKnown);
 		sbinJson.setDataElements(sbinDataElements);
 		dataBlock.setBlockElements(blockElements);
 	}
 	
-	private void parseDATAFields(byte[] elementHex, SBinJson sbinJson, int i, SBinDataElement element) {
+	private boolean parseDATAFields(byte[] elementHex, SBinJson sbinJson, int i, SBinDataElement element) {
+		boolean isObjectKnown = false;
 		int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
 		if (structId == DATA_IDS_MAP_STRUCTID || structId == ENUM_MAP_STRUCTID) {
 			processDataMap(elementHex, element, structId, sbinJson.getCDATStrings());
+			isObjectKnown = true;
 		} else if (i == 0) {
 			// The first DATA element is probably some unique structure, but we parse it too since it contains one of CDAT strings
 			processFirstDATAEntry(elementHex, element, sbinJson.getCDATStrings());
+			isObjectKnown = true;
 		} else if (!sbinJson.getStructs().isEmpty() && sbinJson.getStructs().size() > structId) {
 			List<SBinDataField> fields = new ArrayList<>();
 			SBinStruct struct = sbinJson.getStructs().get(structId);
@@ -597,9 +603,13 @@ public class SBin {
 					fields.add(dataField);
 				}
 				element.setFields(fields);
-
+				isObjectKnown = true;
 			}
 		}
+		if (!isObjectKnown) {
+			element.setHexValue(HEXUtils.hexToString(elementHex).toUpperCase());
+		}
+		return isObjectKnown;
 	}
 	
 	private void processDataMap(byte[] elementHex, SBinDataElement element, int structId, List<SBinCDATEntry> cdatStrings) {
@@ -664,8 +674,8 @@ public class SBin {
 						Arrays.copyOfRange(elementHex, startOffset + fieldRealSize, elementHex.length)));
 			} 
 		}
-		System.out.println("field: " + field.getName() + ", startOffset: " + field.getStartOffset() 
-				+ ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize());
+//		System.out.println("field: " + field.getName() + ", startOffset: " + field.getStartOffset() 
+//				+ ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize());
 		
 		byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + fieldRealSize);
 		dataField.setValue(
@@ -715,7 +725,7 @@ public class SBin {
 		dataField.setEnumDataMapIdJsonPreview(null);
 	}
 	
-	private void clearStructTypeEnums(SBinJson sbinJson) {
+	private void clearJsonOutputStuff(SBinJson sbinJson) {
 		for (SBinStruct struct : sbinJson.getStructs()) {
 			if (!struct.getFieldsArray().isEmpty()) {
 				for (SBinField field : struct.getFieldsArray()) {
@@ -725,6 +735,12 @@ public class SBin {
 		}
 		for (SBinField emptyField : sbinJson.getEmptyFields()) {
 			emptyField.setFieldTypeEnum(null);
+		}
+		// If we know the objects from all SBin blocks, we can properly re-build
+		// the entire CDAT strings order 1-to-1 like original file. 
+		// The first empty entry must be kept though, since it could be found on random blocks of the file
+		if (sbinJson.isCDATAllStringsFromDATA()) {
+			sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, 1));
 		}
 	}
 	
@@ -1084,15 +1100,17 @@ public class SBin {
 			dataFieldStream.write(HEXUtils.decodeHexStr(dataField.getValue()));
 		} else { // Non-HEX value here means that we know it's type
 			SBinFieldType valueType = SBinFieldType.valueOf(dataField.getType());
-			int fieldRealSize = SBinEnumUtils.getFieldStandardSize(valueType); //
+			int fieldRealSize = SBinEnumUtils.getFieldStandardSize(valueType); 
 			for (SBinField field : struct.getFieldsArray()) {
-				if (field.getName().contentEquals(dataField.getType())) {
+				if (field.getName().contentEquals(dataField.getName()) && !field.isDynamicSize()) {
 					fieldRealSize = field.getFieldSize();
+//					System.out.println(dataField.getName() + ", fieldRealSize: " + fieldRealSize);
 				}
 			}
 			byte[] convertedValue = SBinEnumUtils.convertValueByType(valueType, dataField, cdatStrings);
 			dataFieldStream.write(convertedValue);
 			if (convertedValue.length != fieldRealSize) {
+//				System.out.println(dataField.getName() + ", add: " + (fieldRealSize - convertedValue.length));
 				dataFieldStream.write(new byte[fieldRealSize - convertedValue.length]);
 			} // TODO broken for some reason
 		}
