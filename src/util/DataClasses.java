@@ -64,12 +64,6 @@ public final class DataClasses {
 		private List<SBinDataElement> dataElements;
 		@SerializedName("CDAT_Strings")
 		private List<SBinCDATEntry> cdatStrings;
-		@SerializedName("Career_FirstDATAByteValue")
-		private String careerFirstDATAByteValue; 
-		@SerializedName("Career_GarageCars")
-		private List<String> careerGarageCarsArray;
-		@SerializedName("AchievementData")
-		private List<SBinAchievementEntry> achievementArray;
 		@SerializedName("PlaylistsData")
 		private List<SBinPlaylistObj> playlistsArray;
 		
@@ -269,32 +263,11 @@ public final class DataClasses {
 			this.cdatStrings = cdatStrings;
 		}
 		
-		public String getCareerFirstDATAByteValue() {
-			return careerFirstDATAByteValue;
-		}
-		public void setCareerFirstDATAByteValue(String careerFirstDATAByteValue) {
-			this.careerFirstDATAByteValue = careerFirstDATAByteValue;
-		}
-		
-		public List<String> getCareerGarageCarsArray() {
-			return careerGarageCarsArray;
-		}
-		public void setCareerGarageCarsArray(List<String> careerGarageCarsArray) {
-			this.careerGarageCarsArray = careerGarageCarsArray;
-		}
-		
 		public List<SBinDataElement> getDataElements() {
 			return dataElements;
 		}
 		public void setDataElements(List<SBinDataElement> dataElements) {
 			this.dataElements = dataElements;
-		}
-		
-		public List<SBinAchievementEntry> getAchievementArray() {
-			return achievementArray;
-		}
-		public void setAchievementArray(List<SBinAchievementEntry> achievementArray) {
-			this.achievementArray = achievementArray;
 		}
 		
 		public List<SBinPlaylistObj> getPlaylistsArray() {
@@ -651,108 +624,6 @@ public final class DataClasses {
 		}
 		public void setHalVersionValue(int halVersionValue) {
 			this.halVersionValue = halVersionValue;
-		}
-	}
-	
-	public static class SBinAchievementEntry {
-		@SerializedName("OHDRUnkRemainder")
-		private int ohdrUnkRemainder = 0;
-		@SerializedName("Name")
-		private String name;
-		@SerializedName("Desc")
-		private String desc;
-		@SerializedName("Points_Int")
-		private int pointsInt;
-		@SerializedName("AutologAwardId")
-		private String autologAwardId;
-		@SerializedName("CategoryId_Int")
-		private int categoryId;
-		@SerializedName("MetricId_Int")
-		private int metricId;
-		@SerializedName("MetricTarget_Int")
-		private int metricTargetInt;
-		@SerializedName("ImageName")
-		private String imageName;
-		@SerializedName("ImageText")
-		private String imageText;
-		@SerializedName("MetricMilestones")
-		private List<Integer> metricMilestones;
-		
-		public int getOhdrUnkRemainder() {
-			return ohdrUnkRemainder;
-		}
-		public void setOhdrUnkRemainder(int ohdrUnkRemainder) {
-			this.ohdrUnkRemainder = ohdrUnkRemainder;
-		}
-		
-		public String getName() {
-			return name;
-		}
-		public void setName(String name) {
-			this.name = name;
-		}
-		
-		public String getDesc() {
-			return desc;
-		}
-		public void setDesc(String desc) {
-			this.desc = desc;
-		}
-		
-		public int getPointsInt() {
-			return pointsInt;
-		}
-		public void setPointsInt(int pointsInt) {
-			this.pointsInt = pointsInt;
-		}
-		
-		public String getAutologAwardId() {
-			return autologAwardId;
-		}
-		public void setAutologAwardId(String autologAwardId) {
-			this.autologAwardId = autologAwardId;
-		}
-		
-		public int getCategoryId() {
-			return categoryId;
-		}
-		public void setCategoryId(int categoryId) {
-			this.categoryId = categoryId;
-		}
-		
-		public int getMetricId() {
-			return metricId;
-		}
-		public void setMetricId(int metricId) {
-			this.metricId = metricId;
-		}
-		
-		public int getMetricTargetInt() {
-			return metricTargetInt;
-		}
-		public void setMetricTargetInt(int metricTargetInt) {
-			this.metricTargetInt = metricTargetInt;
-		}
-		
-		public String getImageName() {
-			return imageName;
-		}
-		public void setImageName(String imageName) {
-			this.imageName = imageName;
-		}
-		
-		public String getImageText() {
-			return imageText;
-		}
-		public void setImageText(String imageText) {
-			this.imageText = imageText;
-		}
-		
-		public List<Integer> getMetricMilestones() {
-			return metricMilestones;
-		}
-		public void setMetricMilestones(List<Integer> metricMilestones) {
-			this.metricMilestones = metricMilestones;
 		}
 	}
 	
