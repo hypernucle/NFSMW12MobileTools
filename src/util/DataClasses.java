@@ -54,18 +54,16 @@ public final class DataClasses {
 		@SerializedName("CDAT_AllStringsFromDATA")
 		private boolean cdatAllStringsFromData = true;
 		//
-		@SerializedName("EmptyFields")
-		private List<SBinField> emptyFields;
 		@SerializedName("Enums")
-		private List<SBinEnum> enums;
+		private List<SBinEnum> enums = new ArrayList<>();
+		@SerializedName("EmptyFields")
+		private List<SBinField> emptyFields = new ArrayList<>();
 		@SerializedName("Structs")
 		private List<SBinStruct> structs = new ArrayList<>();
 		@SerializedName("DATA_Elements")
 		private List<SBinDataElement> dataElements;
 		@SerializedName("CDAT_Strings")
 		private List<SBinCDATEntry> cdatStrings;
-		@SerializedName("StringData")
-		private List<SBinStringDataEntry> strDataEntriesArray;
 		@SerializedName("Career_FirstDATAByteValue")
 		private String careerFirstDATAByteValue; 
 		@SerializedName("Career_GarageCars")
@@ -231,6 +229,14 @@ public final class DataClasses {
 		
 		//
 		
+		public void addEnum(SBinEnum enumObj) {
+			this.enums.add(enumObj);
+		}
+		
+		public void addEmptyField(SBinField field) {
+			this.emptyFields.add(field);
+		}
+		
 		public void addStruct(SBinStruct struct) {
 			this.structs.add(struct);
 		}
@@ -277,13 +283,6 @@ public final class DataClasses {
 			this.careerGarageCarsArray = careerGarageCarsArray;
 		}
 		
-		public List<SBinStringDataEntry> getStrDataEntriesArray() {
-			return strDataEntriesArray;
-		}
-		public void setStrDataEntriesArray(List<SBinStringDataEntry> strDataEntriesArray) {
-			this.strDataEntriesArray = strDataEntriesArray;
-		}
-		
 		public List<SBinDataElement> getDataElements() {
 			return dataElements;
 		}
@@ -325,63 +324,6 @@ public final class DataClasses {
 		public void setString(String string) {
 			this.string = string;
 		} 
-	}
-	
-	public static class SBinStringDataEntry {
-		@SerializedName("IsTextEntry")
-		private boolean textEntry;
-		@SerializedName("CHDRId")
-		private Long chdrId;
-		@SerializedName("StringId")
-		private String stringId; // Entry
-		@SerializedName("TextValue")
-		private String textValue; // Text
-		@SerializedName("CHDRIdTextRef")
-		private Long chdrIdTextRef; // Entry
-		@SerializedName("HalVersionValue")
-		private String halVersionValue;  // Entry
-		
-		public boolean isTextEntry() {
-			return textEntry;
-		}
-		public void setTextEntry(boolean textEntry) {
-			this.textEntry = textEntry;
-		}
-		
-		public Long getCHDRId() {
-			return chdrId;
-		}
-		public void setCHDRId(Long chdrId) {
-			this.chdrId = chdrId;
-		}
-		
-		public String getStringId() {
-			return stringId;
-		}
-		public void setStringId(String stringId) {
-			this.stringId = stringId;
-		}
-		
-		public String getTextValue() {
-			return textValue;
-		}
-		public void setTextValue(String textValue) {
-			this.textValue = textValue;
-		}
-		
-		public Long getCHDRIdTextRef() {
-			return chdrIdTextRef;
-		}
-		public void setCHDRIdTextRef(Long chdrIdTextRef) {
-			this.chdrIdTextRef = chdrIdTextRef;
-		}
-		
-		public String getHalVersionValue() {
-			return halVersionValue;
-		}
-		public void setHalVersionValue(String halVersionValue) {
-			this.halVersionValue = halVersionValue;
-		}
 	}
 	
 	public static class SBinEnum {
@@ -556,6 +498,8 @@ public final class DataClasses {
 		private boolean structObject = false;
 		@SerializedName("MapElements")
 		private List<String> mapElements;
+		@SerializedName("StringData")
+		private List<SBinStringPair> stringData;
 		@SerializedName("Fields")
 		private List<SBinDataField> fields;
 		
@@ -599,6 +543,13 @@ public final class DataClasses {
 		}
 		public void setStructObject(boolean structObject) {
 			this.structObject = structObject;
+		}
+		
+		public List<SBinStringPair> getStringData() {
+			return stringData;
+		}
+		public void setStringData(List<SBinStringPair> stringData) {
+			this.stringData = stringData;
 		}
 		
 		public List<String> getMapElements() {
@@ -670,6 +621,36 @@ public final class DataClasses {
 		}
 		public void setValue(String value) {
 			this.value = value;
+		}
+	}
+	
+	public static class SBinStringPair {
+		@SerializedName("StringId")
+		private String stringId; 
+		@SerializedName("String")
+		private String string; 
+		@SerializedName("HalVersionValue")
+		private int halVersionValue; 
+		
+		public String getStringId() {
+			return stringId;
+		}
+		public void setStringId(String stringId) {
+			this.stringId = stringId;
+		}
+		
+		public String getString() {
+			return string;
+		}
+		public void setString(String string) {
+			this.string = string;
+		}
+		
+		public int getHalVersionValue() {
+			return halVersionValue;
+		}
+		public void setHalVersionValue(int halVersionValue) {
+			this.halVersionValue = halVersionValue;
 		}
 	}
 	

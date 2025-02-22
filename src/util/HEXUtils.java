@@ -10,7 +10,7 @@ import java.util.List;
 
 import util.DataClasses.SBinCDATEntry;
 
-public class HEXUtils {
+public final class HEXUtils {
 	private HEXUtils() {}
 	
 	public static final byte[] HEX_ARRAY = "0123456789ABCDEF".getBytes(StandardCharsets.UTF_8);

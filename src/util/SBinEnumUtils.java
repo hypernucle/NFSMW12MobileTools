@@ -130,6 +130,8 @@ public class SBinEnumUtils {
 			}
 			i++;
 		}
+		System.out.println("!!! [Enums] Unable to getEnumValueBytes for Enum " 
+				+ dataField.getEnumJsonPreview() + ": default 2 empty bytes is applied instead.");
 		return new byte[2];
 	}
 }
