@@ -41,4 +41,12 @@ public class DataUtils {
 		}
 		return null;
 	}
+	
+	public static SBinDataElement getDataElementFromValueId(SBinJson sbinJson, SBinDataElement dataElement, String fieldName) {
+		SBinDataField lookForElement = DataUtils.getDataFieldByName(dataElement, fieldName);
+		if (lookForElement != null) {
+			return sbinJson.getDataElements().get(HEXUtils.strHexToInt(lookForElement.getValue()));
+		}
+		return null;
+	}
 }

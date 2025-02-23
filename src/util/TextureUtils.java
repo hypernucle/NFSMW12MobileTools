@@ -21,7 +21,7 @@ public class TextureUtils {
 		int width = Integer.parseInt(DataUtils.getDataFieldByName(texParams, "width").getValue());
 		int height = Integer.parseInt(DataUtils.getDataFieldByName(texParams, "height").getValue());
 		// MipMap map comes after the Texture object
-		SBinDataElement mmmap = sbinJson.getDataElements().get(sbinJson.getDataElements().indexOf(texParams) + 1);
+		SBinDataElement mmmap = DataUtils.getDataElementFromValueId(sbinJson, texParams, "mipmaps");
 		
 		List<byte[]> mmOffsets = HEXUtils.splitByteArray(bulkBlock, 0x8);
 		int mipmapsCount = mmmap.getMapElements().size();
@@ -63,14 +63,14 @@ public class TextureUtils {
 		SBinDataElement texParams = DataUtils.getDataElementByStructName(sbinJson, "Texture");
 		int width = Integer.parseInt(DataUtils.getDataFieldByName(texParams, "width").getValue());
 		int height = Integer.parseInt(DataUtils.getDataFieldByName(texParams, "height").getValue());
-		SBinDataElement mmmap = sbinJson.getDataElements().get(sbinJson.getDataElements().indexOf(texParams) + 1);
+		SBinDataElement mmmap = DataUtils.getDataElementFromValueId(sbinJson, texParams, "mipmaps");
 		
 		DDSImage image = DDSImage.read(new File(sbinJson.getFileName() + ".dds"));
 		if (image.getWidth() != width || image.getHeight() != height 
 				|| image.getPixelFormat() != DDSImage.D3DFMT_A8R8G8B8) {
 			System.out.println("!!! Image width, height or format is not compatible with the SBin data - expect broken Output file.");
 		}
-		if (image.getNumMipMaps() != mmmap.getMapElements().size()) {
+		if (image.getNumMipMaps() + 1 != mmmap.getMapElements().size()) {
 			System.out.println("!!! Image Mipmaps amount is not the same as in SBin data - expect broken Output file.");
 		}
 		ByteArrayOutputStream imageHexStream = new ByteArrayOutputStream();

@@ -84,7 +84,7 @@ public final class HEXUtils {
 		return str.getBytes(StandardCharsets.UTF_8);
 	}
 	
-	public static String UTF8BytesToString(byte[] value) {
+	public static String utf8BytesToString(byte[] value) {
 		return new String(value, StandardCharsets.UTF_8);
 	}
 	

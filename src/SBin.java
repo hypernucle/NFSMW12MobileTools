@@ -190,7 +190,7 @@ public class SBin {
 
 		ByteArrayOutputStream fileOutputStr = new ByteArrayOutputStream();
 		fileOutputStr.write(SBIN_HEADER);
-		fileOutputStr.write(BigInteger.valueOf(0x03000000).toByteArray()); // Version 3
+		fileOutputStr.write(HEXUtils.intToByteArrayLE(0x3, 0x4)); // Version 3
 		fileOutputStr.write(finalENUM);
 		fileOutputStr.write(finalSTRU);
 		fileOutputStr.write(finalFIEL);
@@ -256,7 +256,7 @@ public class SBin {
 		SBinBlockObj block = new SBinBlockObj();
 		block.setHeader(header);
 		
-		switch(HEXUtils.UTF8BytesToString(header)) {
+		switch(HEXUtils.utf8BytesToString(header)) {
 		case ENUM_STR:
 			block.setBlockBytes(createENUMBlockBytes(sbinJson));
 			break;
@@ -416,6 +416,11 @@ public class SBin {
 	private String getCDATStringByShortCHDRId(byte[] bytes, int startIndex, int endIndex, List<SBinCDATEntry> cdatStrings) {
 		int hexCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(bytes, startIndex, endIndex));
 		return cdatStrings.get(hexCHDRId).getString();
+	}
+	
+	private SBinCDATEntry getCDATEntryByShortCHDRId(byte[] bytes, int startIndex, int endIndex, List<SBinCDATEntry> cdatStrings) {
+		int hexCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(bytes, startIndex, endIndex));
+		return cdatStrings.get(hexCHDRId);
 	}
 	
 	//
@@ -596,14 +601,22 @@ public class SBin {
 		
 		if (!mapType.isStringDataMap()) {
 			List<String> mapElements = new ArrayList<>();
+			SBinCDATEntry stringObj = null;
 			for (byte[] mapValue : mapValues) {
-				String value = mapType.isCDATEntries()
-						? getCDATStringByShortCHDRId(mapValue, 0, 2, sbinJson.getCDATStrings())
-								: HEXUtils.hexToString(Arrays.copyOf(mapValue, 2));
-				mapElements.add(value);
+				if (mapType.isCDATEntries()) {
+					stringObj = getCDATEntryByShortCHDRId(mapValue, 0, 2, sbinJson.getCDATStrings());
+					mapElements.add(stringObj.getString());
+				} else {
+					mapElements.add(HEXUtils.hexToString(Arrays.copyOf(mapValue, 2)));
+				}
 				bytesTaken += mapValue.length;
 			}
 			element.setMapElements(mapElements);
+			// Enum strings placement can be varied and important, to repack the SBin 1-to-1 to the original
+			if (mapType.isEnumMap() && stringObj != null && 
+					sbinJson.getCDATStrings().indexOf(stringObj) == (sbinJson.getCDATStrings().size() - 1)) {
+				sbinJson.setENUMMidDATAStringsOrdering(false);
+			}
 		} else { // StringData
 			List<SBinStringPair> strDataElements = new ArrayList<>();
 			for (byte[] mapValue : mapValues) {
@@ -672,7 +685,10 @@ public class SBin {
 	}
 	
 	private void readEnumHeaders(SBinJson sbinJson, SBinBlockObj enumBlock) {
-		if (enumBlock.getBlockSizeInt() == 0) {return;}
+		if (enumBlock.getBlockSizeInt() == 0) {
+			sbinJson.setENUMMidDATAStringsOrdering(false);
+			return;
+		}
 		
 		int i = 0;
 		for (byte[] enumBytes : enumBlock.getBlockElements()) {
@@ -754,7 +770,7 @@ public class SBin {
 			//System.out.println("### cdatPos: " + Integer.toHexString(cdatPos) + ", cdatSize: " + Integer.toHexString(cdatEntrySize));
 			
 			SBinCDATEntry cdatEntry = new SBinCDATEntry();
-			cdatEntry.setString(new String(Arrays.copyOfRange(cdatBytes, cdatPos, cdatPos + cdatEntrySize), StandardCharsets.UTF_8));
+			cdatEntry.setString(HEXUtils.utf8BytesToString(Arrays.copyOfRange(cdatBytes, cdatPos, cdatPos + cdatEntrySize)));
 			cdatEntry.setChdrHexId(HEXUtils.hexToString(HEXUtils.shortToBytes(hexId)));
 			cdatStrings.add(cdatEntry);
 			hexId++;
@@ -889,9 +905,9 @@ public class SBin {
 		return block;
 	}
 	
-	// Enum strings must be placed exactly after 1st DATA entry
+	// Enum strings must be placed exactly after 1st DATA entry... Sometimes.
 	private void checkForInsertEnumStrings(int i, SBinJson sbinJson) {
-		if (i != 1) {return;}
+		if (!sbinJson.isENUMMidDATAStringsOrdering() || i != 1) {return;}
 		for (SBinEnum enumObj : sbinJson.getEnums()) {
 			int enumMapId = HEXUtils.twoLEByteArrayToInt(HEXUtils.decodeHexStr(enumObj.getDataIdMapRef()));
 			SBinDataElement dataCheck = sbinJson.getDataElements().get(enumMapId);

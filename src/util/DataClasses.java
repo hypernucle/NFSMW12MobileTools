@@ -19,6 +19,8 @@ public final class DataClasses {
 		private String enumHexStr; 
 		@SerializedName("ENUM_HexEmptyBytesCount")
 		private Long enumHexEmptyBytesCount; 
+		@SerializedName("ENUM_MidDATAStringsOrdering")
+		private boolean enumMidDATAStringsOrdering = true; 
 		@SerializedName("STRU_HexStr")
 		private String struHexStr; 
 		@SerializedName("STRU_HexEmptyBytesCount")
@@ -100,6 +102,13 @@ public final class DataClasses {
 		}
 		public void setENUMHexEmptyBytesCount(Long enumHexEmptyBytesCount) {
 			this.enumHexEmptyBytesCount = enumHexEmptyBytesCount;
+		}
+		
+		public boolean isENUMMidDATAStringsOrdering() {
+			return enumMidDATAStringsOrdering;
+		}
+		public void setENUMMidDATAStringsOrdering(boolean enumMidDATAStringsOrdering) {
+			this.enumMidDATAStringsOrdering = enumMidDATAStringsOrdering;
 		}
 		
 		public String getSTRUHexStr() {
