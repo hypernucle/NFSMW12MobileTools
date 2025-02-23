@@ -24,6 +24,7 @@ import util.SBinEnumUtils;
 import util.SBinFieldType;
 import util.SBinMapUtils;
 import util.SBinMapUtils.SBinMapType;
+import util.TextureUtils;
 
 public class SBin {
 	
@@ -54,7 +55,6 @@ public class SBin {
 	private static final byte[] CDAT_HEADER = HEXUtils.stringToBytes(CDAT_STR);
 	//
 	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
-	private static final int DDS_HEADER_SIZE = 0x80;
 	//
 	private static final String BULK_STR = "BULK";
 	private static final byte[] BULK_HEADER = HEXUtils.stringToBytes(BULK_STR);
@@ -104,12 +104,6 @@ public class SBin {
 		// FIEL: info fields for Structs
 		SBinBlockObj fielBlock = processSBinBlock(sbinData, FIEL_HEADER, OHDR_HEADER);	
 		sbinJson.setFIELHexEmptyBytesCount(Long.valueOf(fielBlock.getBlockEmptyBytesCount()));
-		//
-		if (sbinJson.getSBinType() != SBinType.COMMON) {
-			sbinJson.setENUMHexStr(HEXUtils.hexToString(enumBlock.getBlockBytes()).toUpperCase());
-			sbinJson.setSTRUHexStr(HEXUtils.hexToString(struBlock.getBlockBytes()).toUpperCase());
-			sbinJson.setFIELHexStr(HEXUtils.hexToString(fielBlock.getBlockBytes()).toUpperCase());
-		}
 		// OHDR: map of DATA block
 		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, OHDR_HEADER, DATA_HEADER);		
 		saveOHDRBlockData(sbinJson, ohdrBlock);
@@ -129,19 +123,20 @@ public class SBin {
 		readStructsAndFields(sbinJson, struBlock, fielBlock);
 		parseDATABlock(sbinJson, ohdrBlock, dataBlock);
 		updateEnumRelatedObjects(sbinJson);
+		// Used for separate file editors, not all of .sb files gets proper objects layouts
 		switch(sbinJson.getSBinType()) {
 		case PLAYLISTS:
 			unpackPlaylistsData(sbinJson, dataBlock);
 			break;
 		case TEXTURE:
-			// BULK (Partial info)
+			// BULK: Image mipmap offsets
 			SBinBlockObj bulkBlock = processSBinBlock(sbinData, BULK_HEADER, BARG_HEADER);
-			sbinJson.setBULKHexStr(HEXUtils.hexToString(bulkBlock.getBlockBytes()).toUpperCase());
+//			sbinJson.setBULKHexStr(HEXUtils.hexToString(bulkBlock.getBlockBytes()).toUpperCase());
 			sbinJson.setBULKHexEmptyBytesCount(Long.valueOf(bulkBlock.getBlockEmptyBytesCount()));
-			// BARG (Image data)
+			// BARG: Image plain data
 			SBinBlockObj bargBlock = processSBinBlock(sbinData, BARG_HEADER, null);
-			primitiveExtractDDS(sbinJson, bargBlock.getBlockBytes());
 			sbinJson.setBARGHexEmptyBytesCount(Long.valueOf(bargBlock.getBlockEmptyBytesCount()));
+			TextureUtils.extractImage(sbinJson, bulkBlock.getBlockBytes(), bargBlock.getBlockBytes());
 			break;
 		default: break;
 		}
@@ -189,16 +184,8 @@ public class SBin {
 		
 		ByteArrayOutputStream additionalBlocksStream = new ByteArrayOutputStream();
 		if (sbinJsonObj.getSBinType() == SBinType.TEXTURE) {
-			// BULK (Partial info)
-			SBinBlockObj bulkBlock = createSBinBlock(sbinJsonObj, BULK_HEADER);
-			bulkBlock.setBlockEmptyBytesCount(sbinJsonObj.getBULKHexEmptyBytesCount().intValue());
-			byte[] finalBULK = buildSBinBlock(bulkBlock);
-			additionalBlocksStream.write(finalBULK);
-			// BARG (Image data)
-			SBinBlockObj bargBlock = createBARGBlock(sbinJsonObj, BARG_HEADER);
-			bargBlock.setBlockEmptyBytesCount(sbinJsonObj.getBARGHexEmptyBytesCount().intValue());
-			byte[] finalBARG = buildSBinBlock(bargBlock);
-			additionalBlocksStream.write(finalBARG);
+			// BULK & BARG
+			createBULKBARGBlocks(sbinJsonObj, additionalBlocksStream);
 		}
 
 		ByteArrayOutputStream fileOutputStr = new ByteArrayOutputStream();
@@ -282,7 +269,7 @@ public class SBin {
 		case CDAT_STR:
 			break;
 		case BULK_STR:
-			block.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getBULKHexStr()));
+//			block.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getBULKHexStr()));
 			break;
 		case BARG_STR:
 			break;
@@ -378,6 +365,25 @@ public class SBin {
 		sbinJson.setOHDRHexEmptyBytesCount(Long.valueOf(ohdrBlock.getBlockEmptyBytesCount()));
 	}
 	
+	private void createBULKBARGBlocks(SBinJson sbinJson, ByteArrayOutputStream additionalBlocksStream) throws IOException {
+		SBinBlockObj bargBlock = new SBinBlockObj();
+		bargBlock.setHeader(BARG_HEADER);
+		TextureUtils.repackImage(bargBlock, sbinJson);
+		setSBinBlockAttributes(bargBlock);
+		bargBlock.setBlockEmptyBytesCount(sbinJson.getBARGHexEmptyBytesCount().intValue());
+		byte[] finalBARG = buildSBinBlock(bargBlock);
+		
+		SBinBlockObj bulkBlock = new SBinBlockObj();
+		bulkBlock.setHeader(BULK_HEADER);
+		bulkBlock.setBlockBytes(bargBlock.getBULKMap());
+		setSBinBlockAttributes(bulkBlock);
+		bulkBlock.setBlockEmptyBytesCount(sbinJson.getBULKHexEmptyBytesCount().intValue());
+		byte[] finalBULK = buildSBinBlock(bulkBlock);
+		
+		additionalBlocksStream.write(finalBULK);
+		additionalBlocksStream.write(finalBARG);
+	}
+	
 	private void setSBinBlockAttributes(SBinBlockObj block) {
 		block.setFnv1Hash(HEXUtils.intToByteArrayLE(FNV1.hash32(block.getBlockBytes()), 0x4)); 
 		if (block.getBlockBytes().length != 0) {
@@ -417,8 +423,7 @@ public class SBin {
 	//
 	
 	private void readStructsAndFields(SBinJson sbinJson, SBinBlockObj struBlock, SBinBlockObj fielBlock) {
-		if (sbinJson.getSBinType() != SBinType.COMMON || struBlock.getBlockSizeInt() == 0
-				|| fielBlock.getBlockSizeInt() == 0) {return;}
+		if (struBlock.getBlockSizeInt() == 0 || fielBlock.getBlockSizeInt() == 0) {return;}
 		
 		int firstReadableField = 0;
 		int id = 0;
@@ -667,7 +672,7 @@ public class SBin {
 	}
 	
 	private void readEnumHeaders(SBinJson sbinJson, SBinBlockObj enumBlock) {
-		if (sbinJson.getSBinType() != SBinType.COMMON || enumBlock.getBlockSizeInt() == 0) {return;}
+		if (enumBlock.getBlockSizeInt() == 0) {return;}
 		
 		int i = 0;
 		for (byte[] enumBytes : enumBlock.getBlockElements()) {
@@ -734,7 +739,7 @@ public class SBin {
 		}
 		throw new NullPointerException("!!! One of DATA elements contains wrong referenced Struct (" + structName + ").");
 	}
-	
+
 	//
 	// SBin unpack functions
 	//
@@ -815,14 +820,6 @@ public class SBin {
 		// Keep only structure-related strings in CDAT output. 
 		// This time string ordering is unusual, so we proceed with hard-coded position
 		sbinJson.setCDATStrings(sbinJson.getCDATStrings().subList(0, 13));
-	}
-	
-	private void primitiveExtractDDS(SBinJson sbinJson, byte[] imageHex) throws IOException {
-		ByteArrayOutputStream ddsFileStream = new ByteArrayOutputStream();
-		byte[] headerHex = Files.readAllBytes(Paths.get("templates/dds_1024x_headertemplate"));
-		ddsFileStream.write(headerHex);
-		ddsFileStream.write(imageHex);
-		Files.write(Paths.get(sbinJson.getFileName() + ".dds"), ddsFileStream.toByteArray());
 	}
 	
 	//
@@ -983,18 +980,6 @@ public class SBin {
 			} 
 		}
 		return dataFieldStream.toByteArray();
-	}
-	
-	// Very primitive
-	private SBinBlockObj createBARGBlock(SBinJson sbinJson, byte[] header) throws IOException {
-		SBinBlockObj block = new SBinBlockObj();
-		block.setHeader(header);
-		
-		byte[] imageHex = Files.readAllBytes(Paths.get(sbinJson.getFileName() + ".dds"));
-		block.setBlockBytes(Arrays.copyOfRange(imageHex, DDS_HEADER_SIZE, imageHex.length));
-		
-		setSBinBlockAttributes(block);
-		return block;
 	}
 	
 	private byte[] preparePlaylistsDataForSBinBlock(SBinBlockObj block, SBinJson sbinJson) throws IOException {

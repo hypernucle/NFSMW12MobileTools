@@ -3,6 +3,9 @@ package util;
 import java.util.List;
 
 import util.DataClasses.SBinCDATEntry;
+import util.DataClasses.SBinDataElement;
+import util.DataClasses.SBinDataField;
+import util.DataClasses.SBinJson;
 
 public class DataUtils {
 	private DataUtils() {}
@@ -19,5 +22,23 @@ public class DataUtils {
 		newEntry.setChdrHexId(HEXUtils.hexToString(newCHDRId));
 		cdatList.add(newEntry);
 		return newCHDRId;
+	}
+	
+	public static SBinDataElement getDataElementByStructName(SBinJson sbinJson, String structName) {
+		for (SBinDataElement dataElement : sbinJson.getDataElements()) {
+			if (dataElement.getStructName().contentEquals(structName)) {
+				return dataElement;
+			}
+		}
+		return null;
+	}
+	
+	public static SBinDataField getDataFieldByName(SBinDataElement dataElement, String name) {
+		for (SBinDataField field : dataElement.getFields()) {
+			if (field.getName().contentEquals(name)) {
+				return field;
+			}
+		}
+		return null;
 	}
 }

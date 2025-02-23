@@ -87,6 +87,11 @@ public final class HEXUtils {
 	public static String UTF8BytesToString(byte[] value) {
 		return new String(value, StandardCharsets.UTF_8);
 	}
+	
+	public static int strHexToInt(String hexStr) {
+		byte[] bytes = decodeHexStr(hexStr);
+		return bytes.length != 4 ? twoLEByteArrayToInt(bytes) : byteArrayToInt(bytes);
+	}
 
 	// https://stackoverflow.com/a/66638297
 	public static List<byte[]> splitByteArray(byte[] array, int chunkSize) {

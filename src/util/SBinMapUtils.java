@@ -25,8 +25,14 @@ public class SBinMapUtils {
 	
 	public static SBinMapType getMapType(Integer id, SBinJson sbinJson) {
 		SBinMapType type = mapTypes.getOrDefault(id, null);
-		if (type != null && type.isEnumMap() && sbinJson.getEnums().isEmpty()) {
-			return null; // Different files can have a varied header rules
+		if (type != null) { // Different files can have a varied header rules
+			if (type.isEnumMap() && sbinJson.getEnums().isEmpty()) {
+				return null; 
+			}
+			if (type.isStringDataMap() && (sbinJson.getStructs() == null 
+					|| !sbinJson.getStructs().get(0).getName().contentEquals("StringPair"))) {
+				return null; 
+			}
 		}
 		return type;
 	}

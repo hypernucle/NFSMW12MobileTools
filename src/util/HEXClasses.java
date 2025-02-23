@@ -21,6 +21,7 @@ public final class HEXClasses {
 		private byte[] blockBytes = new byte[0];
 		private List<byte[]> blockElements;
 		private List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
+		private byte[] bulkMap;
 		
 		public void addToOHDRMapTemplate(Integer entrySize, Integer remainder) {
 			this.ohdrMapTemplate.add(new SBinOHDREntry(entrySize, remainder));
@@ -80,6 +81,13 @@ public final class HEXClasses {
 		}
 		public void setOHDRMapTemplate(List<SBinOHDREntry> ohdrMapTemplate) {
 			this.ohdrMapTemplate = ohdrMapTemplate;
+		}
+
+		public byte[] getBULKMap() {
+			return bulkMap;
+		}
+		public void setBULKMap(byte[] bulkMap) {
+			this.bulkMap = bulkMap;
 		}
 	}
 	

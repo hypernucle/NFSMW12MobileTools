@@ -12,7 +12,7 @@ public enum SBinFieldType {
 	DATA_ID_REF(0xF), 
 	DATA_ID_MAP(0x11),
 	ENUM_ID_INT32(0x12),
-	INT32_0X16(0x16);
+	BULK_OFFSET_ID(0x16);
 	
 	private int id;
 

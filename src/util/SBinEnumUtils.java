@@ -20,7 +20,7 @@ public class SBinEnumUtils {
 		case INT8:
 			size = 0x1;
 			break;
-		case INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case ENUM_ID_INT32: case INT32_0X16:
+		case INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case ENUM_ID_INT32: case BULK_OFFSET_ID:
 			size = 0x4;
 			break;
 		case BOOLEAN: case CHDR_ID_REF:
@@ -40,7 +40,7 @@ public class SBinEnumUtils {
 			return getDefaultHEXString(valueHex, dataField);
 		}
 		switch(field.getFieldTypeEnum()) {
-		case INT32: case ENUM_ID_INT32: case INT32_0X16:
+		case INT32: case ENUM_ID_INT32: case BULK_OFFSET_ID:
 			// ENUM_ID_INT32: Enum stores all values on the last elements of DATA block, 
 			// so we read their values on other function.
 			strValue = String.valueOf(HEXUtils.byteArrayToInt(valueHex));
@@ -72,7 +72,7 @@ public class SBinEnumUtils {
 			SBinFieldType type, SBinDataField dataField, SBinJson sbinJson, int fieldRealSize) {
 		byte[] value = new byte[0];
 		switch(type) {
-		case INT32: case INT32_0X16:
+		case INT32: case BULK_OFFSET_ID:
 			value = HEXUtils.intToByteArrayLE(Integer.parseInt(dataField.getValue()), 0x4);
 			break;
 		case FLOAT:
