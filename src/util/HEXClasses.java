@@ -20,6 +20,7 @@ public final class HEXClasses {
 		private int blockEmptyBytesCount = 0;
 		private byte[] blockBytes = new byte[0];
 		private List<byte[]> blockElements;
+		private boolean lastBlock = false;
 		private List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
 		private byte[] bulkMap;
 		
@@ -74,6 +75,13 @@ public final class HEXClasses {
 		}
 		public void setBlockElements(List<byte[]> blockElements) {
 			this.blockElements = blockElements;
+		}
+
+		public boolean isLastBlock() {
+			return lastBlock;
+		}
+		public void setLastBlock(boolean lastBlock) {
+			this.lastBlock = lastBlock;
 		}
 
 		public List<SBinOHDREntry> getOHDRMapTemplate() {

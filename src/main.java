@@ -2,7 +2,7 @@ import java.io.IOException;
 
 public class main {
 
-	private static String about = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.10.1"
+	private static String about = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.11"
 			+ "\nUsage examples:"
 			+ "\n\t# Music Playlists editor (full support):"
 			+ "\n\t\t'unpack playlists playlists.sb', 'repack playlists.sb.json'"

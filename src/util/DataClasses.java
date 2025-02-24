@@ -17,42 +17,24 @@ public final class DataClasses {
 		private SBinType sbinType; 
 		@SerializedName("ENUM_HexStr")
 		private String enumHexStr; 
-		@SerializedName("ENUM_HexEmptyBytesCount")
-		private Long enumHexEmptyBytesCount; 
 		@SerializedName("ENUM_MidDATAStringsOrdering")
 		private boolean enumMidDATAStringsOrdering = true; 
 		@SerializedName("STRU_HexStr")
 		private String struHexStr; 
-		@SerializedName("STRU_HexEmptyBytesCount")
-		private Long struHexEmptyBytesCount; 
 		@SerializedName("FIEL_HexStr")
 		private String fielHexStr; 
-		@SerializedName("FIEL_HexEmptyBytesCount")
-		private Long fielHexEmptyBytesCount; 
 		@SerializedName("OHDR_HexStr")
 		private String ohdrHexStr; 
-		@SerializedName("OHDR_HexEmptyBytesCount")
-		private Long ohdrHexEmptyBytesCount; 
 		@SerializedName("DATA_HexStr")
 		private String dataHexStr; 
-		@SerializedName("DATA_HexEmptyBytesCount")
-		private Long dataHexEmptyBytesCount; 
 		@SerializedName("CHDR_HexStr")
 		private String chdrHexStr; 
-		@SerializedName("CHDR_HexEmptyBytesCount")
-		private Long chdrHexEmptyBytesCount; 
 		@SerializedName("CDAT_HexStr")
 		private String cdatHexStr;
-		@SerializedName("CDAT_HexEmptyBytesCount")
-		private Long cdatHexEmptyBytesCount;
 		@SerializedName("BULK_HexStr")
 		private String bulkHexStr;
-		@SerializedName("BULK_HexEmptyBytesCount")
-		private Long bulkHexEmptyBytesCount;
 		@SerializedName("BARG_HexStr")
 		private String bargHexStr;
-		@SerializedName("BARG_HexEmptyBytesCount")
-		private Long bargHexEmptyBytesCount;
 		@SerializedName("CDAT_AllStringsFromDATA")
 		private boolean cdatAllStringsFromData = true;
 		//
@@ -97,13 +79,6 @@ public final class DataClasses {
 			this.enumHexStr = enumHexStr;
 		}
 		
-		public Long getENUMHexEmptyBytesCount() {
-			return enumHexEmptyBytesCount;
-		}
-		public void setENUMHexEmptyBytesCount(Long enumHexEmptyBytesCount) {
-			this.enumHexEmptyBytesCount = enumHexEmptyBytesCount;
-		}
-		
 		public boolean isENUMMidDATAStringsOrdering() {
 			return enumMidDATAStringsOrdering;
 		}
@@ -118,25 +93,11 @@ public final class DataClasses {
 			this.struHexStr = struHexStr;
 		}
 		
-		public Long getSTRUHexEmptyBytesCount() {
-			return struHexEmptyBytesCount;
-		}
-		public void setSTRUHexEmptyBytesCount(Long struHexEmptyBytesCount) {
-			this.struHexEmptyBytesCount = struHexEmptyBytesCount;
-		}
-		
 		public String getFIELHexStr() {
 			return fielHexStr;
 		}
 		public void setFIELHexStr(String fielHexStr) {
 			this.fielHexStr = fielHexStr;
-		}
-		
-		public Long getFIELHexEmptyBytesCount() {
-			return fielHexEmptyBytesCount;
-		}
-		public void setFIELHexEmptyBytesCount(Long fielHexEmptyBytesCount) {
-			this.fielHexEmptyBytesCount = fielHexEmptyBytesCount;
 		}
 		
 		public String getOHDRHexStr() {
@@ -146,25 +107,11 @@ public final class DataClasses {
 			this.ohdrHexStr = ohdrHexStr;
 		}
 		
-		public Long getOHDRHexEmptyBytesCount() {
-			return ohdrHexEmptyBytesCount;
-		}
-		public void setOHDRHexEmptyBytesCount(Long ohdrHexEmptyBytesCount) {
-			this.ohdrHexEmptyBytesCount = ohdrHexEmptyBytesCount;
-		}
-		
 		public String getDATAHexStr() {
 			return dataHexStr;
 		}
 		public void setDATAHexStr(String dataHexStr) {
 			this.dataHexStr = dataHexStr;
-		}
-		
-		public Long getDATAHexEmptyBytesCount() {
-			return dataHexEmptyBytesCount;
-		}
-		public void setDATAHexEmptyBytesCount(Long dataHexEmptyBytesCount) {
-			this.dataHexEmptyBytesCount = dataHexEmptyBytesCount;
 		}
 		
 		public String getCHDRHexStr() {
@@ -174,25 +121,11 @@ public final class DataClasses {
 			this.chdrHexStr = chdrHexStr;
 		}
 		
-		public Long getCHDRHexEmptyBytesCount() {
-			return chdrHexEmptyBytesCount;
-		}
-		public void setCHDRHexEmptyBytesCount(Long chdrHexEmptyBytesCount) {
-			this.chdrHexEmptyBytesCount = chdrHexEmptyBytesCount;
-		}
-		
 		public String getCDATHexStr() {
 			return cdatHexStr;
 		}
 		public void setCDATHexStr(String cdatHexStr) {
 			this.cdatHexStr = cdatHexStr;
-		}
-		
-		public Long getCDATHexEmptyBytesCount() {
-			return cdatHexEmptyBytesCount;
-		}
-		public void setCDATHexEmptyBytesCount(Long cdatHexEmptyBytesCount) {
-			this.cdatHexEmptyBytesCount = cdatHexEmptyBytesCount;
 		}
 		
 		public String getBULKHexStr() {
@@ -202,25 +135,11 @@ public final class DataClasses {
 			this.bulkHexStr = bulkHexStr;
 		}
 		
-		public Long getBULKHexEmptyBytesCount() {
-			return bulkHexEmptyBytesCount;
-		}
-		public void setBULKHexEmptyBytesCount(Long bulkHexEmptyBytesCount) {
-			this.bulkHexEmptyBytesCount = bulkHexEmptyBytesCount;
-		}
-		
 		public String getBARGHexStr() {
 			return bargHexStr;
 		}
 		public void setBARGHexStr(String bargHexStr) {
 			this.bargHexStr = bargHexStr;
-		}
-		
-		public Long getBARGHexEmptyBytesCount() {
-			return bargHexEmptyBytesCount;
-		}
-		public void setBARGHexEmptyBytesCount(Long bargHexEmptyBytesCount) {
-			this.bargHexEmptyBytesCount = bargHexEmptyBytesCount;
 		}
 		
 		public boolean isCDATAllStringsFromDATA() {

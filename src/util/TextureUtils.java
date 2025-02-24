@@ -70,9 +70,6 @@ public class TextureUtils {
 				|| image.getPixelFormat() != DDSImage.D3DFMT_A8R8G8B8) {
 			System.out.println("!!! Image width, height or format is not compatible with the SBin data - expect broken Output file.");
 		}
-		if (image.getNumMipMaps() + 1 != mmmap.getMapElements().size()) {
-			System.out.println("!!! Image Mipmaps amount is not the same as in SBin data - expect broken Output file.");
-		}
 		ByteArrayOutputStream imageHexStream = new ByteArrayOutputStream();
 		ByteArrayOutputStream bulkMapStream = new ByteArrayOutputStream();
 		int startOffset = 0;
