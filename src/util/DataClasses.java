@@ -296,6 +296,8 @@ public final class DataClasses {
 		private String name;
 		@SerializedName("Type")
 		private String type;
+		@SerializedName("SubStruct")
+		private String subStruct;
 		@SerializedName("HexValue")
 		private String hexValue;
 		@SerializedName("Enum_JsonPreview")
@@ -325,6 +327,13 @@ public final class DataClasses {
 		}
 		public void setType(String type) {
 			this.type = type;
+		}
+		
+		public String getSubStruct() {
+			return subStruct;
+		}
+		public void setSubStruct(String subStruct) {
+			this.subStruct = subStruct;
 		}
 		
 		public String getHexValue() {
@@ -473,6 +482,8 @@ public final class DataClasses {
 		private String name;
 		@SerializedName("Type")
 		private String type;
+		@SerializedName("SubStruct")
+		private String subStruct;
 		@SerializedName("Enum_JsonPreview")
 		private String enumJsonPreview;
 		@SerializedName("EnumDataMapId_JsonPreview")
@@ -481,6 +492,8 @@ public final class DataClasses {
 		private boolean forcedHexValue;
 		@SerializedName("Value")
 		private String value;
+		@SerializedName("SubFields")
+		private List<SBinDataField> subFields;
 		
 		public String getName() {
 			return name;
@@ -494,6 +507,13 @@ public final class DataClasses {
 		}
 		public void setType(String type) {
 			this.type = type;
+		}
+		
+		public String getSubStruct() {
+			return subStruct;
+		}
+		public void setSubStruct(String subStruct) {
+			this.subStruct = subStruct;
 		}
 		
 		public String getEnumJsonPreview() {
@@ -522,6 +542,13 @@ public final class DataClasses {
 		}
 		public void setValue(String value) {
 			this.value = value;
+		}
+		
+		public List<SBinDataField> getSubFields() {
+			return subFields;
+		}
+		public void setSubFields(List<SBinDataField> subFields) {
+			this.subFields = subFields;
 		}
 	}
 	

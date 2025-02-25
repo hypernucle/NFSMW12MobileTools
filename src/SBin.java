@@ -440,6 +440,15 @@ public class SBin {
 			sbinJson.addStruct(struct);
 			id++;
 		}
+		// Do it after the initial iteration, since any other sub-struct could be mentioned
+		for (SBinStruct struct : sbinJson.getStructs()) {
+			for (SBinField field : struct.getFieldsArray()) {
+				if (field.getFieldTypeEnum() != null && 
+						field.getFieldTypeEnum().equals(SBinFieldType.SUB_STRUCT)) {
+					field.setSubStruct(sbinJson.getStructs().get(field.getSpecOrderId()).getName());
+				}
+			}
+		}
 		if (firstReadableField != 0) {
 			for (int i = 0; i < firstReadableField; i++) {
 				sbinJson.addEmptyField(readField(sbinJson, fielBlock, i, 0, 0, false));
@@ -555,7 +564,23 @@ public class SBin {
 						dataField.setEnumJsonPreview(field.getEnumJsonPreview());
 						dataField.setEnumDataMapIdJsonPreview(getTempEnumDataIdValue(sbinJson, field));
 					}
-					processDataFieldValue(field, dataField, elementHex, sbinJson, element);
+					
+					if (field.getFieldTypeEnum() != null && 
+							field.getFieldTypeEnum().equals(SBinFieldType.SUB_STRUCT)) {
+						List<SBinDataField> subFields = new ArrayList<>();
+						dataField.setSubStruct(field.getSubStruct());
+						SBinStruct subStruct = DataUtils.getStructByName(sbinJson, field.getSubStruct());
+						for (SBinField subField : subStruct.getFieldsArray()) {
+							SBinDataField subDataField = new SBinDataField();
+							subDataField.setName(subField.getName());
+							subDataField.setType(subField.getType());
+							processDataFieldValue(subField, field, subDataField, elementHex, sbinJson, element);
+							subFields.add(subDataField);
+						}
+						dataField.setSubFields(subFields);
+					} else {
+						processDataFieldValue(field, null, dataField, elementHex, sbinJson, element);
+					}
 					fields.add(dataField);
 				}
 				element.setFields(fields);
@@ -643,26 +668,35 @@ public class SBin {
 		element.setFields(fields);
 	}
 	
-	private void processDataFieldValue(
-			SBinField field, SBinDataField dataField, byte[] elementHex, SBinJson sbinJson, SBinDataElement element) {
+	private void processDataFieldValue(SBinField field, SBinField parentField, 
+			SBinDataField dataField, byte[] elementHex, SBinJson sbinJson, SBinDataElement element) {
 		// First two bytes is taken by Struct ID, start byte goes after
 		int startOffset = field.getStartOffset() + 2;
+		if (parentField != null) {
+			startOffset += parentField.getStartOffset();
+		}
 		int fieldRealSize = field.getFieldSize();
 		if (field.isDynamicSize()) {
-			fieldRealSize = elementHex.length - startOffset;
-			int fieldStandardSize = SBinEnumUtils.getFieldStandardSize(field.getFieldTypeEnum());
-			
-			if (field.getFieldTypeEnum() != null && fieldStandardSize < fieldRealSize) {
-				int paddingSize = elementHex.length - startOffset - fieldStandardSize;
-				fieldRealSize -= paddingSize;
-				element.setExtraHexValue(HEXUtils.hexToString(
-						Arrays.copyOfRange(elementHex, startOffset + fieldRealSize, elementHex.length)));
-			} 
+			if (parentField != null && !parentField.isDynamicSize()) { // If not last, we could get full Struct size from parent Struct
+				fieldRealSize = parentField.getFieldSize() - field.getStartOffset();
+			} else {
+				fieldRealSize = elementHex.length - startOffset;
+				int fieldStandardSize = SBinEnumUtils.getFieldStandardSize(field.getFieldTypeEnum());
+				
+				if (field.getFieldTypeEnum() != null && fieldStandardSize < fieldRealSize) {
+					int paddingSize = elementHex.length - startOffset - fieldStandardSize;
+					fieldRealSize -= paddingSize;
+					element.setExtraHexValue(HEXUtils.hexToString(
+							Arrays.copyOfRange(elementHex, startOffset + fieldRealSize, elementHex.length)));
+				} 
+			}
 		}
 //		System.out.println("field: " + field.getName() + ", type: " + field.getType() + ", startOffset: " + field.getStartOffset() 
-//				+ ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize() + ", hex: " + HEXUtils.hexToString(elementHex));
+//				+ ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize() + ", hex size: " + elementHex.length
+//				+ ", hex: " + HEXUtils.hexToString(elementHex));
 		
 		byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + fieldRealSize);
+//		System.out.println("valueHex: " + HEXUtils.hexToString(valueHex));
 		dataField.setValue(
 				SBinEnumUtils.formatFieldValueUnpack(field, dataField, fieldRealSize, valueHex, sbinJson));
 	}
@@ -900,7 +934,14 @@ public class SBin {
 			dataElementStream.write(HEXUtils.shortToBytes((short)struct.getId()));
 			//
 			for (SBinDataField dataField : dataEntry.getFields()) {
-				dataElementStream.write(fieldValueToBytes(dataField, struct, sbinJson));
+				if (dataField.getSubStruct() != null) {
+					SBinStruct subStruct = getStructObject(sbinJson, dataField.getSubStruct());
+					for (SBinDataField subField : dataField.getSubFields()) {
+						dataElementStream.write(fieldValueToBytes(subField, subStruct, sbinJson));
+					}
+				} else {
+					dataElementStream.write(fieldValueToBytes(dataField, struct, sbinJson));
+				}
 			}
 		} 
 		else if (dataEntry.getStructName().contentEquals(FIRST_DATA_STRUCTNAME)) {

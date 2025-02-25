@@ -7,6 +7,7 @@ import util.DataClasses.SBinCDATEntry;
 import util.DataClasses.SBinDataElement;
 import util.DataClasses.SBinDataField;
 import util.DataClasses.SBinJson;
+import util.DataClasses.SBinStruct;
 
 public class DataUtils {
 	private DataUtils() {}
@@ -57,6 +58,15 @@ public class DataUtils {
 		SBinDataField lookForElement = DataUtils.getDataFieldByName(dataElement, fieldName);
 		if (lookForElement != null) {
 			return sbinJson.getDataElements().get(HEXUtils.strHexToInt(lookForElement.getValue()));
+		}
+		return null;
+	}
+	
+	public static SBinStruct getStructByName(SBinJson sbinJson, String name) {
+		for (SBinStruct struct : sbinJson.getStructs()) {
+			if (struct.getName().contentEquals(name)) {
+				return struct;
+			}
 		}
 		return null;
 	}

@@ -10,6 +10,7 @@ public enum SBinFieldType {
 	BOOLEAN(0x9), 
 	CHDR_ID_REF(0xD), 
 	DATA_ID_REF(0xF), 
+	SUB_STRUCT(0x10),
 	DATA_ID_MAP(0x11),
 	ENUM_ID_INT32(0x12),
 	BULK_OFFSET_ID(0x16);
