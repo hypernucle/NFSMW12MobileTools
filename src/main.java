@@ -9,7 +9,7 @@ public class main {
 			+ "\n\t# Basic SBin file repacker (DATA objects where possible + HEX-edits if you know what to do)."
 			+ "\n\t# Applicable & tested for Races, CarDesc, StringData, Pursuit, Achievements, Career (Garage Cars) configs:"
 			+ "\n\t\t'unpack common event_01_race.prefabs.sb', 'repack event_01_race.prefabs.sb.json'"
-			+ "\n\t# Texture repacker (only single-texture .sba with RGBA (A8R8G8B8) format):"
+			+ "\n\t# Texture repacker (only .sba with RGBA (A8R8G8B8) format):"
 			+ "\n\t\t'unpack texture texture_car_model_year_diffuse_00.sba', 'repack texture_car_model_year_diffuse_00.sba.json'";
 	
 	public static void main(String[] args) throws IOException {

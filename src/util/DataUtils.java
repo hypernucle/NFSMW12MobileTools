@@ -1,5 +1,6 @@
 package util;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import util.DataClasses.SBinCDATEntry;
@@ -31,6 +32,16 @@ public class DataUtils {
 			}
 		}
 		return null;
+	}
+	
+	public static List<SBinDataElement> getAllDataElementsByStructName(SBinJson sbinJson, String structName) {
+		List<SBinDataElement> elements = new ArrayList<>();
+		for (SBinDataElement dataElement : sbinJson.getDataElements()) {
+			if (dataElement.getStructName().contentEquals(structName)) {
+				elements.add(dataElement);
+			}
+		}
+		return elements;
 	}
 	
 	public static SBinDataField getDataFieldByName(SBinDataElement dataElement, String name) {
