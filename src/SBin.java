@@ -20,6 +20,7 @@ import util.DataClasses.*;
 import util.DataUtils;
 import util.HEXClasses.*;
 import util.HEXUtils;
+import util.LaunchParameters;
 import util.SBinEnumUtils;
 import util.SBinFieldType;
 import util.SBinMapUtils;
@@ -112,8 +113,14 @@ public class SBin {
 				sbinJson.getSBinType() == SBinType.TEXTURE ? BULK_HEADER : null);
 		sbinJson.setCDATStrings(prepareCDATStrings(chdrBlock.getBlockBytes(), cdatBlock.getBlockBytes()));
 		
-		readEnumHeaders(sbinJson, enumBlock);
-		readStructsAndFields(sbinJson, struBlock, fielBlock);
+		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {
+			sbinJson.setENUMHexStr(HEXUtils.hexToString(enumBlock.getBlockBytes()).toUpperCase());
+			sbinJson.setSTRUHexStr(HEXUtils.hexToString(struBlock.getBlockBytes()).toUpperCase());
+			sbinJson.setFIELHexStr(HEXUtils.hexToString(fielBlock.getBlockBytes()).toUpperCase());
+		} else {
+			readEnumHeaders(sbinJson, enumBlock);
+			readStructsAndFields(sbinJson, struBlock, fielBlock);
+		}
 		parseDATABlock(sbinJson, ohdrBlock, dataBlock);
 		updateEnumRelatedObjects(sbinJson);
 		// Used for separate file editors, not all of .sb files gets proper objects layouts
@@ -534,7 +541,13 @@ public class SBin {
 		dataBlock.setBlockElements(blockElements);
 	}
 	
+	// TODO Re-write, looks not so great
 	private boolean parseDATAFields(byte[] elementHex, SBinJson sbinJson, int i, SBinDataElement element) {
+		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {
+			fillElementHexValue(element, elementHex);
+			return false;
+		}
+		
 		boolean isObjectKnown = false;
 		int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
 		SBinMapType mapType = SBinMapUtils.getMapType(
@@ -588,9 +601,13 @@ public class SBin {
 			}
 		}
 		if (!isObjectKnown) {
-			element.setHexValue(HEXUtils.hexToString(elementHex).toUpperCase());
+			fillElementHexValue(element, elementHex);
 		}
 		return isObjectKnown;
+	}
+	
+	private void fillElementHexValue(SBinDataElement element, byte[] elementHex) {
+		element.setHexValue(HEXUtils.hexToString(elementHex));
 	}
 	
 	// Element must be equal or longer than the sum of known Struct field sizes
@@ -691,14 +708,25 @@ public class SBin {
 				} 
 			}
 		}
-//		System.out.println("field: " + field.getName() + ", type: " + field.getType() + ", startOffset: " + field.getStartOffset() 
-//				+ ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize() + ", hex size: " + elementHex.length
-//				+ ", hex: " + HEXUtils.hexToString(elementHex));
-		
-		byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + fieldRealSize);
-//		System.out.println("valueHex: " + HEXUtils.hexToString(valueHex));
-		dataField.setValue(
-				SBinEnumUtils.formatFieldValueUnpack(field, dataField, fieldRealSize, valueHex, sbinJson));
+		try { // Some files like layouts.sb is just too complex & different
+			byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + fieldRealSize);
+			dataField.setValue(
+					SBinEnumUtils.formatFieldValueUnpack(field, dataField, fieldRealSize, valueHex, sbinJson));
+		} catch(ArrayIndexOutOfBoundsException | IllegalArgumentException ex) {
+			handleUnknownDATAHex(field, fieldRealSize, dataField, elementHex, element.getOrderHexId());
+		}
+	}
+	
+	private void handleUnknownDATAHex(SBinField field, int fieldRealSize, 
+			SBinDataField dataField, byte[] elementHex, String hexId) {
+		System.out.println("!!! Unsupported DATA object. Output file is not suitable for repack. Info: Hex ID: " + hexId + ", field: " 
+				+ field.getName() + ", type: " + field.getType() + ", startOffset: " + field.getStartOffset() 
+				+ ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize() + ", hex size: " + elementHex.length
+				+ ", hex: " + HEXUtils.hexToString(elementHex));
+		dataField.setType(null);
+		dataField.setEnumJsonPreview(null);
+		dataField.setForcedHexValue(true);
+		dataField.setValue("!pls fix!");
 	}
 	
 	private void readEnumHeaders(SBinJson sbinJson, SBinBlockObj enumBlock) {
@@ -722,6 +750,8 @@ public class SBin {
 	
 	// Not the best way to update values, but it works
 	private void updateEnumRelatedObjects(SBinJson sbinJson) {
+		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {return;}
+		
 		for (SBinDataElement dataElement : sbinJson.getDataElements()) {
 			if (dataElement.getFields() == null) {continue;}
 			for (SBinDataField dataField : dataElement.getFields()) {
