@@ -21,6 +21,7 @@ import util.DataUtils;
 import util.HEXClasses.*;
 import util.HEXUtils;
 import util.LaunchParameters;
+import util.SBinBlockType;
 import util.SBinEnumUtils;
 import util.SBinFieldType;
 import util.SBinMapUtils;
@@ -31,37 +32,19 @@ public class SBin {
 	
 	Gson gson = new Gson();
 	
-	private static final String SBIN_STR = "SBIN";
-	private static final byte[] SBIN_HEADER = HEXUtils.stringToBytes(SBIN_STR);
-	
-	private static final String ENUM_STR = "ENUM";
-	private static final byte[] ENUM_HEADER = HEXUtils.stringToBytes(ENUM_STR);
-	
-	private static final String STRU_STR = "STRU";
-	private static final byte[] STRU_HEADER = HEXUtils.stringToBytes(STRU_STR);
-	
-	private static final String FIEL_STR = "FIEL";
-	private static final byte[] FIEL_HEADER = HEXUtils.stringToBytes(FIEL_STR);
-	
-	private static final String OHDR_STR = "OHDR";
-	private static final byte[] OHDR_HEADER = HEXUtils.stringToBytes(OHDR_STR);
-	
-	private static final String DATA_STR = "DATA";
-	private static final byte[] DATA_HEADER = HEXUtils.stringToBytes(DATA_STR);
-	
-	private static final String CHDR_STR = "CHDR";
-	private static final byte[] CHDR_HEADER = HEXUtils.stringToBytes(CHDR_STR);
-	
-	private static final String CDAT_STR = "CDAT";
-	private static final byte[] CDAT_HEADER = HEXUtils.stringToBytes(CDAT_STR);
+	private static final byte[] SBIN_HEADER = SBinBlockType.getBytes(SBinBlockType.SBIN);
+	private static final byte[] ENUM_HEADER = SBinBlockType.getBytes(SBinBlockType.ENUM);
+	private static final byte[] STRU_HEADER = SBinBlockType.getBytes(SBinBlockType.STRU);
+	private static final byte[] FIEL_HEADER = SBinBlockType.getBytes(SBinBlockType.FIEL);
+	private static final byte[] OHDR_HEADER = SBinBlockType.getBytes(SBinBlockType.OHDR);
+	private static final byte[] DATA_HEADER = SBinBlockType.getBytes(SBinBlockType.DATA);
+	private static final byte[] CHDR_HEADER = SBinBlockType.getBytes(SBinBlockType.CHDR);
+	private static final byte[] CDAT_HEADER = SBinBlockType.getBytes(SBinBlockType.CDAT);
 	//
 	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
 	//
-	private static final String BULK_STR = "BULK";
-	private static final byte[] BULK_HEADER = HEXUtils.stringToBytes(BULK_STR);
-	
-	private static final String BARG_STR = "BARG";
-	private static final byte[] BARG_HEADER = HEXUtils.stringToBytes(BARG_STR);
+	private static final byte[] BULK_HEADER = SBinBlockType.getBytes(SBinBlockType.BULK);
+	private static final byte[] BARG_HEADER = SBinBlockType.getBytes(SBinBlockType.BARG);
 	//
 	private static final byte[] PLAYLISTS_DATA_DESC_UNK1 = HEXUtils.decodeHexStr("1C0002000D000C000000");
 	private static final byte[] PLAYLISTS_DATA_DESC_UNK2 = HEXUtils.decodeHexStr("04000F00180000000000");
@@ -97,21 +80,21 @@ public class SBin {
 		changeCurPos(0x8); // Skip SBin header + version
 
 		// ENUM: Enum objects stored as a DATA block maps
-		SBinBlockObj enumBlock = processSBinBlock(sbinData, ENUM_HEADER, STRU_HEADER);		
+		SBinBlockObj enumBlock = processSBinBlock(sbinData, SBinBlockType.ENUM, SBinBlockType.STRU);		
 		// STRU: object structures of DATA block
-		SBinBlockObj struBlock = processSBinBlock(sbinData, STRU_HEADER, FIEL_HEADER);
+		SBinBlockObj struBlock = processSBinBlock(sbinData, SBinBlockType.STRU, SBinBlockType.FIEL);
 		// FIEL: info fields for Structs
-		SBinBlockObj fielBlock = processSBinBlock(sbinData, FIEL_HEADER, OHDR_HEADER);	
+		SBinBlockObj fielBlock = processSBinBlock(sbinData, SBinBlockType.FIEL, SBinBlockType.OHDR);	
 		// OHDR: map of DATA block
-		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, OHDR_HEADER, DATA_HEADER);		
+		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, SBinBlockType.OHDR, SBinBlockType.DATA);		
 		// DATA: various objects info
-		SBinBlockObj dataBlock = processSBinBlock(sbinData, DATA_HEADER, CHDR_HEADER);	
+		SBinBlockObj dataBlock = processSBinBlock(sbinData, SBinBlockType.DATA, SBinBlockType.CHDR);	
 		// CHDR: map of CDAT block
-		SBinBlockObj chdrBlock = processSBinBlock(sbinData, CHDR_HEADER, CDAT_HEADER);
+		SBinBlockObj chdrBlock = processSBinBlock(sbinData, SBinBlockType.CHDR, SBinBlockType.CDAT);
 		// CDAT: field names & string variables
-		SBinBlockObj cdatBlock = processSBinBlock(sbinData, CDAT_HEADER, 
-				sbinJson.getSBinType() == SBinType.TEXTURE ? BULK_HEADER : null);
-		sbinJson.setCDATStrings(prepareCDATStrings(chdrBlock.getBlockBytes(), cdatBlock.getBlockBytes()));
+		SBinBlockObj cdatBlock = processSBinBlock(sbinData, SBinBlockType.CDAT, 
+				sbinJson.getSBinType() == SBinType.TEXTURE ? SBinBlockType.BULK : null);
+		sbinJson.setCDATStrings(prepareCDATStrings(chdrBlock.getBlockElements(), cdatBlock.getBlockBytes()));
 		
 		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {
 			sbinJson.setENUMHexStr(HEXUtils.hexToString(enumBlock.getBlockBytes()).toUpperCase());
@@ -130,11 +113,11 @@ public class SBin {
 			break;
 		case TEXTURE:
 			// BULK: Image mipmap offsets
-			SBinBlockObj bulkBlock = processSBinBlock(sbinData, BULK_HEADER, BARG_HEADER);
+			SBinBlockObj bulkBlock = processSBinBlock(sbinData, SBinBlockType.BULK, SBinBlockType.BARG);
 //			sbinJson.setBULKHexStr(HEXUtils.hexToString(bulkBlock.getBlockBytes()).toUpperCase());
 			// BARG: Image plain data
-			SBinBlockObj bargBlock = processSBinBlock(sbinData, BARG_HEADER, null);
-			TextureUtils.extractImage(sbinJson, bulkBlock.getBlockBytes(), bargBlock.getBlockBytes());
+			SBinBlockObj bargBlock = processSBinBlock(sbinData, SBinBlockType.BARG, null);
+			TextureUtils.extractImage(sbinJson, bulkBlock, bargBlock.getBlockBytes());
 			break;
 		default: break;
 		}
@@ -152,7 +135,7 @@ public class SBin {
 		sbinJsonObj.setSBinType(sbinJsonObj.getSBinType());
 
 		// ENUM
-		SBinBlockObj enumBlock = createSBinBlock(sbinJsonObj, ENUM_HEADER);
+		SBinBlockObj enumBlock = createSBinBlock(sbinJsonObj, SBinBlockType.ENUM);
 		byte[] finalENUM = buildSBinBlock(enumBlock);
 		// STRU & FIEL
 		SBinBlockObj struBlock = new SBinBlockObj();
@@ -161,16 +144,16 @@ public class SBin {
 		byte[] finalFIEL = buildSBinBlock(fielBlock);
 		byte[] finalSTRU = buildSBinBlock(struBlock);
 		// DATA & OHDR
-		SBinBlockObj dataBlock = createSBinBlock(sbinJsonObj, DATA_HEADER);
+		SBinBlockObj dataBlock = createSBinBlock(sbinJsonObj, SBinBlockType.DATA);
 		byte[] finalDATA = buildSBinBlock(dataBlock);
 		//
-		SBinBlockObj ohdrBlock = createOHDRBlock(sbinJsonObj, dataBlock, OHDR_HEADER);
+		SBinBlockObj ohdrBlock = createOHDRBlock(sbinJsonObj, dataBlock, SBinBlockType.OHDR);
 		byte[] finalOHDR = buildSBinBlock(ohdrBlock);
 		// CHDR & CDAT
-		SBinBlockObj cdatBlock = createSBinBlock(sbinJsonObj, CDAT_HEADER);
+		SBinBlockObj cdatBlock = createSBinBlock(sbinJsonObj, SBinBlockType.CDAT);
 		byte[] finalCDAT = buildSBinBlock(cdatBlock);
 		//
-		SBinBlockObj chdrBlock = createCHDRBlock(cdatBlock.getBlockElements(), CHDR_HEADER);
+		SBinBlockObj chdrBlock = createCHDRBlock(cdatBlock.getBlockElements(), SBinBlockType.CHDR);
 		byte[] finalCHDR = buildSBinBlock(chdrBlock);
 		
 		ByteArrayOutputStream additionalBlocksStream = new ByteArrayOutputStream();
@@ -179,7 +162,7 @@ public class SBin {
 			createBULKBARGBlocks(sbinJsonObj, additionalBlocksStream);
 		} 
 		ByteArrayOutputStream fileOutputStr = new ByteArrayOutputStream();
-		fileOutputStr.write(SBIN_HEADER);
+		fileOutputStr.write(SBinBlockType.getBytes(SBinBlockType.SBIN));
 		fileOutputStr.write(HEXUtils.intToByteArrayLE(0x3, 0x4)); // Version 3
 		fileOutputStr.write(finalENUM);
 		fileOutputStr.write(finalSTRU);
@@ -215,25 +198,32 @@ public class SBin {
 	// SBin block methods
 	//
 
-	private SBinBlockObj processSBinBlock(byte[] sbinData, byte[] header, byte[] nextHeader) {
+	private SBinBlockObj processSBinBlock(byte[] sbinData, SBinBlockType header, SBinBlockType nextHeader) {
 		SBinBlockObj block = new SBinBlockObj();
-		block.setHeader(header);
+		block.setHeader(SBinBlockType.getBytes(header));
 		changeCurPos(0x4); // Skip header
 		block.setBlockSize(getBytesFromCurPos(sbinData, 0x4));
 		block.setBlockSizeInt(HEXUtils.byteArrayToInt(block.getBlockSize()));
 		changeCurPos(0x8); // Skip size + hash
 		if (block.getBlockSizeInt() != 0x0) {
 			block.setBlockBytes(getBytesFromCurPos(sbinData, block.getBlockSizeInt()));
-			if (Arrays.equals(header, STRU_HEADER)) {
+			switch(header) {
+			case OHDR:
+				block.setBlockElements(HEXUtils.splitByteArray(block.getBlockBytes(), 0x4));
+				break;
+			case STRU:
 				block.setBlockElements(HEXUtils.splitByteArray(block.getBlockBytes(), 0x6));
-			} else if (Arrays.equals(header, FIEL_HEADER) || Arrays.equals(header, ENUM_HEADER)) {
+				break;
+			case ENUM: case FIEL: case CHDR: case BULK:
 				block.setBlockElements(HEXUtils.splitByteArray(block.getBlockBytes(), 0x8));
-			} 
+				break;
+			default: break;
+			}
 			changeCurPos(block.getBlockSizeInt()); 
 		}
 
 		byte[] fielHeaderCheck = getBytesFromCurPos(sbinData, 0x4);
-		while (nextHeader != null && !Arrays.equals(fielHeaderCheck, nextHeader)) {
+		while (nextHeader != null && !Arrays.equals(fielHeaderCheck, SBinBlockType.getBytes(nextHeader))) {
 			changeCurPos(0x1); // Happens in some files and usually on STRU block, with additional empty 0x2 over the block size
 			block.setBlockEmptyBytesCount(block.getBlockEmptyBytesCount() + 1);
 			fielHeaderCheck = getBytesFromCurPos(sbinData, 0x4);
@@ -242,30 +232,30 @@ public class SBin {
 		return block;
 	}
 
-	private SBinBlockObj createSBinBlock(SBinJson sbinJson, byte[] header) throws IOException {
+	private SBinBlockObj createSBinBlock(SBinJson sbinJson, SBinBlockType header) throws IOException {
 		SBinBlockObj block = new SBinBlockObj();
-		block.setHeader(header);
+		block.setHeader(SBinBlockType.getBytes(header));
 		
-		switch(HEXUtils.utf8BytesToString(header)) {
-		case ENUM_STR:
+		switch(header) {
+		case ENUM:
 			block.setBlockBytes(createENUMBlockBytes(sbinJson));
 			break;
-		case OHDR_STR:
+		case OHDR:
 			break;
-		case DATA_STR:
+		case DATA:
 			createDATABlockBytes(sbinJson, block);
 			break;
-		case CHDR_STR:
+		case CHDR:
 			break;
-		case CDAT_STR:
+		case CDAT:
 			createCDATBlock(sbinJson, block);
 			if (!sbinJson.getSBinType().equals(SBinType.TEXTURE)) {
 				block.setLastBlock(true);
 			}
 			break;
-		case BULK_STR:
+		case BULK:
 			break;
-		case BARG_STR:
+		case BARG:
 			break;
 		default: 
 			block.setBlockBytes(new byte[0]);
@@ -291,8 +281,8 @@ public class SBin {
 	}
 	
 	private void createSTRUFIELBlocks(SBinJson sbinJson, SBinBlockObj struBlock, SBinBlockObj fielBlock) throws IOException {
-		struBlock.setHeader(STRU_HEADER);
-		fielBlock.setHeader(FIEL_HEADER);
+		struBlock.setHeader(SBinBlockType.getBytes(SBinBlockType.STRU));
+		fielBlock.setHeader(SBinBlockType.getBytes(SBinBlockType.FIEL));
 		
 		if (sbinJson.getStructs().isEmpty()) {
 			struBlock.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getSTRUHexStr()));
@@ -510,16 +500,15 @@ public class SBin {
 	}
 	
 	private void parseDATABlock(SBinJson sbinJson, SBinBlockObj ohdrBlock, SBinBlockObj dataBlock) {
-		List<byte[]> ohdrPosDataBytes = HEXUtils.splitByteArray(ohdrBlock.getBlockBytes(), 0x4);
-		ohdrPosDataBytes.remove(0); // First one is always 0x1
-		ohdrPosDataBytes.add(HEXUtils.intToByteArrayLE(dataBlock.getBlockBytes().length * 0x8, 0x4)); // Create a fake last one, same as DATA size
+		ohdrBlock.getBlockElements().remove(0); // First one is always 0x1
+		ohdrBlock.getBlockElements().add(HEXUtils.intToByteArrayLE(dataBlock.getBlockBytes().length * 0x8, 0x4)); // Create a fake last one, same as DATA size
 		List<SBinDataElement> sbinDataElements = new ArrayList<>();
 		List<byte[]> blockElements = new ArrayList<>();
 		
 		int ohdrPrevValue = 0;
 		int i = 0;
 		boolean isAllObjectsKnown = true;
-		for (byte[] ohdrPos : ohdrPosDataBytes) {
+		for (byte[] ohdrPos : ohdrBlock.getBlockElements()) {
 			SBinDataElement element = new SBinDataElement();
 			int elementOHDR = HEXUtils.byteArrayToInt(ohdrPos);
 			int elementBegin = elementOHDR / 0x8;
@@ -807,8 +796,7 @@ public class SBin {
 	// SBin unpack functions
 	//
 	
-	private List<SBinCDATEntry> prepareCDATStrings(byte[] chdrBytes, byte[] cdatBytes) {
-		List<byte[]> chdrEntries = HEXUtils.splitByteArray(chdrBytes, 0x8);
+	private List<SBinCDATEntry> prepareCDATStrings(List<byte[]> chdrEntries, byte[] cdatBytes) {
 		List<SBinCDATEntry> cdatStrings = new ArrayList<>();
 		int hexId = 0x0;
 		for (byte[] chdrEntry : chdrEntries) {
@@ -883,9 +871,9 @@ public class SBin {
 	// SBin repack functions
 	//
 	
-	private SBinBlockObj createCHDRBlock(List<byte[]> cdatElements, byte[] header) throws IOException {
+	private SBinBlockObj createCHDRBlock(List<byte[]> cdatElements, SBinBlockType header) throws IOException {
 		SBinBlockObj block = new SBinBlockObj();
-		block.setHeader(header);
+		block.setHeader(SBinBlockType.getBytes(header));
 		
 		ByteArrayOutputStream chdrHexStream = new ByteArrayOutputStream();
 		int pos = 0;
@@ -902,9 +890,9 @@ public class SBin {
 		return block;
 	}
 	
-	private SBinBlockObj createOHDRBlock(SBinJson sbinJson, SBinBlockObj dataBlock, byte[] header) throws IOException {
+	private SBinBlockObj createOHDRBlock(SBinJson sbinJson, SBinBlockObj dataBlock, SBinBlockType header) throws IOException {
 		SBinBlockObj block = new SBinBlockObj();
-		block.setHeader(header);
+		block.setHeader(SBinBlockType.getBytes(header));
 		
 		ByteArrayOutputStream ohdrHexStream = new ByteArrayOutputStream();
 		ohdrHexStream.write(HEXUtils.intToByteArrayLE(0x1, 0x4)); // First element in OHDR

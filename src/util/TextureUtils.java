@@ -25,9 +25,8 @@ public class TextureUtils {
 	
 	private static int imageFormatId = DDSImage.D3DFMT_A8R8G8B8;
 	
-	public static void extractImage(SBinJson sbinJson, byte[] bulkBlock, byte[] bargBlock) throws IOException {
+	public static void extractImage(SBinJson sbinJson, SBinBlockObj bulkBlock, byte[] bargBlock) throws IOException {
 		List<SBinDataElement> textures = DataUtils.getAllDataElementsByStructName(sbinJson, PARAM_TEXTURE);
-		List<byte[]> mmOffsets = HEXUtils.splitByteArray(bulkBlock, 0x8);
 		int i = 0;
 		for (SBinDataElement texParams : textures) {
 			int width = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_WIDTH).getValue());
@@ -60,9 +59,9 @@ public class TextureUtils {
 				}
 				
 				int mmLevelStartOffset = HEXUtils.byteArrayToInt(
-						Arrays.copyOfRange(mmOffsets.get(bulkElementId), 0, 4));
+						Arrays.copyOfRange(bulkBlock.getBlockElements().get(bulkElementId), 0, 4));
 				int mmLevelAdditionOffset = HEXUtils.byteArrayToInt(
-						Arrays.copyOfRange(mmOffsets.get(bulkElementId), 4, 8));
+						Arrays.copyOfRange(bulkBlock.getBlockElements().get(bulkElementId), 4, 8));
 				byte[] mmData = Arrays.copyOfRange(
 						bargBlock, mmLevelStartOffset, mmLevelStartOffset + mmLevelAdditionOffset);
 				mipMaps[curMipmap] = ByteBuffer.wrap(

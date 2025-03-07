@@ -23,7 +23,7 @@ public class SBinEnumUtils {
 		case INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case ENUM_ID_INT32: case BULK_OFFSET_ID:
 			size = 0x4;
 			break;
-		case BOOLEAN: case CHDR_ID_REF:
+		case BOOLEAN: case CHDR_ID_REF: case CHDR_ID_REF_0X14:
 			size = 0x2;
 			break;
 		default: break;
@@ -56,7 +56,7 @@ public class SBinEnumUtils {
 				strValue = getDefaultHEXString(valueHex, dataField);
 			}
 			break;
-		case CHDR_ID_REF: 
+		case CHDR_ID_REF: case CHDR_ID_REF_0X14:
 			strValue = sbinJson.getCDATStrings().get(HEXUtils.twoLEByteArrayToInt(valueHex)).getString();
 			break;
 		case INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
