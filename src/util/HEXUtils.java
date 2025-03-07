@@ -58,6 +58,14 @@ public final class HEXUtils {
 	public static byte[] floatToBytes(float value) {  
 	     return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putFloat(value).array();
 	}
+	
+	public static double bytesToDouble(byte[] bytes) {
+	    return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getDouble();
+	}
+	
+	public static byte[] doubleToBytes(double value) {  
+	     return ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putDouble(value).array();
+	}
 
 	// Taken from StackOverflow (maybeWeCouldStealAVan)
 	public static String hexToString(byte[] bytes) {

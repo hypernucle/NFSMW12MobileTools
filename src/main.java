@@ -4,7 +4,7 @@ import util.LaunchParameters;
 
 public class main {
 
-	private static String about = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.14"
+	private static final String ABOUT = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.14"
 			+ "\nUsage examples:"
 			+ "\n\t# Music Playlists editor (full support):"
 			+ "\n\t\t'unpack playlists playlists.sb', 'repack playlists.sb.json'"
@@ -32,7 +32,7 @@ public class main {
 			sbinTools.repackSBin(args[1]);
 			break;
 		case "hash":
-			sbinTools.getFNVHash(args[1], args[2]);
+			sbinTools.getFNVHash(args[1]);
 			break;
 		default: 
 			displayHelp();
@@ -41,7 +41,7 @@ public class main {
 	}
 	
 	private static void displayHelp() {
-		System.out.println(about);
+		System.out.println(ABOUT);
 	}
 	
 }

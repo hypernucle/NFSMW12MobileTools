@@ -1,7 +1,6 @@
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Reader;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,19 +31,7 @@ public class SBin {
 	
 	Gson gson = new Gson();
 	
-	private static final byte[] SBIN_HEADER = SBinBlockType.getBytes(SBinBlockType.SBIN);
-	private static final byte[] ENUM_HEADER = SBinBlockType.getBytes(SBinBlockType.ENUM);
-	private static final byte[] STRU_HEADER = SBinBlockType.getBytes(SBinBlockType.STRU);
-	private static final byte[] FIEL_HEADER = SBinBlockType.getBytes(SBinBlockType.FIEL);
-	private static final byte[] OHDR_HEADER = SBinBlockType.getBytes(SBinBlockType.OHDR);
-	private static final byte[] DATA_HEADER = SBinBlockType.getBytes(SBinBlockType.DATA);
-	private static final byte[] CHDR_HEADER = SBinBlockType.getBytes(SBinBlockType.CHDR);
-	private static final byte[] CDAT_HEADER = SBinBlockType.getBytes(SBinBlockType.CDAT);
-	//
 	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
-	//
-	private static final byte[] BULK_HEADER = SBinBlockType.getBytes(SBinBlockType.BULK);
-	private static final byte[] BARG_HEADER = SBinBlockType.getBytes(SBinBlockType.BARG);
 	//
 	private static final byte[] PLAYLISTS_DATA_DESC_UNK1 = HEXUtils.decodeHexStr("1C0002000D000C000000");
 	private static final byte[] PLAYLISTS_DATA_DESC_UNK2 = HEXUtils.decodeHexStr("04000F00180000000000");
@@ -114,7 +101,6 @@ public class SBin {
 		case TEXTURE:
 			// BULK: Image mipmap offsets
 			SBinBlockObj bulkBlock = processSBinBlock(sbinData, SBinBlockType.BULK, SBinBlockType.BARG);
-//			sbinJson.setBULKHexStr(HEXUtils.hexToString(bulkBlock.getBlockBytes()).toUpperCase());
 			// BARG: Image plain data
 			SBinBlockObj bargBlock = processSBinBlock(sbinData, SBinBlockType.BARG, null);
 			TextureUtils.extractImage(sbinJson, bulkBlock, bargBlock.getBlockBytes());
@@ -177,15 +163,11 @@ public class SBin {
 		Files.write(Paths.get("new_" + sbinJsonObj.getFileName()), fileBytes);
 	}
 
-	public void getFNVHash(String filePath, String type) throws IOException {
+	public void getFNVHash(String filePath) throws IOException {
 		byte[] fileArray = Files.readAllBytes(Paths.get(filePath));
 		byte[] filePart;
 
-		if (type.contentEquals("dds")) {
-			filePart = Arrays.copyOfRange(fileArray, 128, fileArray.length);
-		} else {
-			filePart = Arrays.copyOfRange(fileArray, 0, fileArray.length);
-		}
+		filePart = Arrays.copyOfRange(fileArray, 0, fileArray.length);
 
 		int hexHash = FNV1.hash32(filePart);
 		String output = Integer.toHexString(HEXUtils.hexRev(hexHash)).toUpperCase();
@@ -198,6 +180,8 @@ public class SBin {
 	// SBin block methods
 	//
 
+	// TODO Must read it by 4-bytes-block method. 
+	// Additional empty bytes after blocks exists to help fit the info, for 4-bytes-block reading method
 	private SBinBlockObj processSBinBlock(byte[] sbinData, SBinBlockType header, SBinBlockType nextHeader) {
 		SBinBlockObj block = new SBinBlockObj();
 		block.setHeader(SBinBlockType.getBytes(header));
@@ -284,7 +268,7 @@ public class SBin {
 		struBlock.setHeader(SBinBlockType.getBytes(SBinBlockType.STRU));
 		fielBlock.setHeader(SBinBlockType.getBytes(SBinBlockType.FIEL));
 		
-		if (sbinJson.getStructs().isEmpty()) {
+		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {
 			struBlock.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getSTRUHexStr()));
 			fielBlock.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getFIELHexStr()));
 		} else {
@@ -348,14 +332,14 @@ public class SBin {
 	
 	private void createBULKBARGBlocks(SBinJson sbinJson, ByteArrayOutputStream additionalBlocksStream) throws IOException {
 		SBinBlockObj bargBlock = new SBinBlockObj();
-		bargBlock.setHeader(BARG_HEADER);
+		bargBlock.setHeader(SBinBlockType.getBytes(SBinBlockType.BARG));
 		TextureUtils.repackImage(bargBlock, sbinJson);
 		setSBinBlockAttributes(bargBlock);
 		bargBlock.setLastBlock(true);
 		byte[] finalBARG = buildSBinBlock(bargBlock);
 		
 		SBinBlockObj bulkBlock = new SBinBlockObj();
-		bulkBlock.setHeader(BULK_HEADER);
+		bulkBlock.setHeader(SBinBlockType.getBytes(SBinBlockType.BULK));
 		bulkBlock.setBlockBytes(bargBlock.getBULKMap());
 		setSBinBlockAttributes(bulkBlock);
 		byte[] finalBULK = buildSBinBlock(bulkBlock);
@@ -569,17 +553,7 @@ public class SBin {
 					
 					if (field.getFieldTypeEnum() != null && 
 							field.getFieldTypeEnum().equals(SBinFieldType.SUB_STRUCT)) {
-						List<SBinDataField> subFields = new ArrayList<>();
-						dataField.setSubStruct(field.getSubStruct());
-						SBinStruct subStruct = DataUtils.getStructByName(sbinJson, field.getSubStruct());
-						for (SBinField subField : subStruct.getFieldsArray()) {
-							SBinDataField subDataField = new SBinDataField();
-							subDataField.setName(subField.getName());
-							subDataField.setType(subField.getType());
-							processDataFieldValue(subField, field, subDataField, elementHex, sbinJson, element);
-							subFields.add(subDataField);
-						}
-						dataField.setSubFields(subFields);
+						readSubStructs(sbinJson, dataField, field, elementHex, element);
 					} else {
 						processDataFieldValue(field, null, dataField, elementHex, sbinJson, element);
 					}
@@ -593,6 +567,29 @@ public class SBin {
 			fillElementHexValue(element, elementHex);
 		}
 		return isObjectKnown;
+	}
+	
+	private void readSubStructs(SBinJson sbinJson, SBinDataField dataField, 
+			SBinField field, byte[] elementHex, SBinDataElement element) {
+		List<SBinDataField> subFields = new ArrayList<>();
+		dataField.setSubStruct(field.getSubStruct());
+		SBinStruct struct = DataUtils.getStructByName(sbinJson, field.getSubStruct());
+		
+		for (SBinField subField : struct.getFieldsArray()) {
+			SBinDataField subDataField = new SBinDataField();
+			subDataField.setName(subField.getName());
+			subDataField.setType(subField.getType());
+			
+			if (subField.getFieldTypeEnum() != null && 
+					subField.getFieldTypeEnum().equals(SBinFieldType.SUB_STRUCT)) {
+				// there can be more than one Sub-Struct level
+				readSubStructs(sbinJson, subDataField, subField, elementHex, element);
+			} else {
+				processDataFieldValue(subField, field, subDataField, elementHex, sbinJson, element);
+			}
+			subFields.add(subDataField);
+		}
+		dataField.setSubFields(subFields);
 	}
 	
 	private void fillElementHexValue(SBinDataElement element, byte[] elementHex) {
@@ -953,6 +950,7 @@ public class SBin {
 			//
 			for (SBinDataField dataField : dataEntry.getFields()) {
 				if (dataField.getSubStruct() != null) {
+					// TODO Support for nested sub-structs
 					SBinStruct subStruct = getStructObject(sbinJson, dataField.getSubStruct());
 					for (SBinDataField subField : dataField.getSubFields()) {
 						dataElementStream.write(fieldValueToBytes(subField, subStruct, sbinJson));

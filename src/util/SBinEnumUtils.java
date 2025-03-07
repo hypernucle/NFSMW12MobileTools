@@ -17,14 +17,17 @@ public class SBinEnumUtils {
 		int size = 0x0;
 		if (type == null) {return size;}
 		switch(type) {
-		case INT8:
+		case INT8: case U_INT8:
 			size = 0x1;
+			break;
+		case BOOLEAN: case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
+			size = 0x2;
 			break;
 		case INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case ENUM_ID_INT32: case BULK_OFFSET_ID:
 			size = 0x4;
 			break;
-		case BOOLEAN: case CHDR_ID_REF: case CHDR_ID_REF_0X14:
-			size = 0x2;
+		case DOUBLE:
+			size = 0x8;
 			break;
 		default: break;
 		}
@@ -48,6 +51,9 @@ public class SBinEnumUtils {
 		case FLOAT:
 			strValue = String.valueOf(HEXUtils.bytesToFloat(valueHex));
 			break;
+		case DOUBLE:
+			strValue = String.valueOf(HEXUtils.bytesToDouble(valueHex));
+			break;
 		case BOOLEAN: // Boolean sizes can be really different
 			int valueInt = valueHex.length == 1 ? valueHex[0] : HEXUtils.twoLEByteArrayToInt(valueHex);
 			if (valueInt < 2) { // Precaution in case of unknown value type
@@ -56,11 +62,11 @@ public class SBinEnumUtils {
 				strValue = getDefaultHEXString(valueHex, dataField);
 			}
 			break;
-		case CHDR_ID_REF: case CHDR_ID_REF_0X14:
+		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
 			strValue = sbinJson.getCDATStrings().get(HEXUtils.twoLEByteArrayToInt(valueHex)).getString();
 			break;
-		case INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
-			// INT8: Primarily used for HEX colors, left as it is
+		case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
+			// U_INT8: Primarily used for HEX colors, left as it is
 			// DATA_ID: simpler to provide HEX code and compare/find with other DATA info
 			strValue = getDefaultHEXString(valueHex, dataField);
 			break;
@@ -78,6 +84,9 @@ public class SBinEnumUtils {
 		case FLOAT:
 			value = HEXUtils.floatToBytes(Float.parseFloat(dataField.getValue()));
 			break;
+		case DOUBLE:
+			value = HEXUtils.doubleToBytes(Double.parseDouble(dataField.getValue()));
+			break;
 		case BOOLEAN: 
 			boolean bool = Boolean.parseBoolean(dataField.getValue());
 			int boolInt = bool ? 1 : 0;
@@ -92,7 +101,7 @@ public class SBinEnumUtils {
 		case ENUM_ID_INT32:
 			value = getEnumValueBytes(sbinJson, dataField);
 			break;
-		case INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
+		case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			value = HEXUtils.decodeHexStr(dataField.getValue());
 			break;
 		}
