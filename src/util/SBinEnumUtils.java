@@ -23,7 +23,7 @@ public class SBinEnumUtils {
 		case BOOLEAN: case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
 			size = 0x2;
 			break;
-		case INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case ENUM_ID_INT32: case BULK_OFFSET_ID:
+		case INT32: case U_INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case ENUM_ID_INT32: case BULK_OFFSET_ID:
 			size = 0x4;
 			break;
 		case DOUBLE:
@@ -43,7 +43,7 @@ public class SBinEnumUtils {
 			return getDefaultHEXString(valueHex, dataField);
 		}
 		switch(field.getFieldTypeEnum()) {
-		case INT32: case ENUM_ID_INT32: case BULK_OFFSET_ID:
+		case INT32: case U_INT32: case ENUM_ID_INT32: case BULK_OFFSET_ID:
 			// ENUM_ID_INT32: Enum stores all values on the last elements of DATA block, 
 			// so we read their values on other function.
 			strValue = String.valueOf(HEXUtils.byteArrayToInt(valueHex));
@@ -65,7 +65,7 @@ public class SBinEnumUtils {
 		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
 			strValue = sbinJson.getCDATStrings().get(HEXUtils.twoLEByteArrayToInt(valueHex)).getString();
 			break;
-		case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
+		case INT8: case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			// U_INT8: Primarily used for HEX colors, left as it is
 			// DATA_ID: simpler to provide HEX code and compare/find with other DATA info
 			strValue = getDefaultHEXString(valueHex, dataField);
@@ -78,7 +78,7 @@ public class SBinEnumUtils {
 			SBinFieldType type, SBinDataField dataField, SBinJson sbinJson, int fieldRealSize) {
 		byte[] value = new byte[0];
 		switch(type) {
-		case INT32: case BULK_OFFSET_ID:
+		case INT32: case U_INT32: case BULK_OFFSET_ID:
 			value = HEXUtils.intToByteArrayLE(Integer.parseInt(dataField.getValue()), 0x4);
 			break;
 		case FLOAT:
@@ -95,13 +95,13 @@ public class SBinEnumUtils {
 				value = new byte[]{value[0]};
 			} 
 			break;
-		case CHDR_ID_REF: 
+		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
 			value = DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), dataField.getValue());
 			break;
 		case ENUM_ID_INT32:
 			value = getEnumValueBytes(sbinJson, dataField);
 			break;
-		case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
+		case INT8: case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			value = HEXUtils.decodeHexStr(dataField.getValue());
 			break;
 		}

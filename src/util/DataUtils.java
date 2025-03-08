@@ -6,6 +6,7 @@ import java.util.List;
 import util.DataClasses.SBinCDATEntry;
 import util.DataClasses.SBinDataElement;
 import util.DataClasses.SBinDataField;
+import util.DataClasses.SBinField;
 import util.DataClasses.SBinJson;
 import util.DataClasses.SBinStruct;
 
@@ -69,5 +70,14 @@ public class DataUtils {
 			}
 		}
 		return null;
+	}
+	
+	public static boolean checkForOverrideField(SBinJson sbinJson, SBinFieldType type) {
+		for (SBinField field : sbinJson.getEmptyFields()) {
+			if (field.getFieldTypeEnum().equals(type)) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

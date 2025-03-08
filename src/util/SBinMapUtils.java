@@ -1,5 +1,6 @@
 package util;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,9 +24,14 @@ public class SBinMapUtils {
 		mapTypes.putIfAbsent(mapType.getTypeId(), mapType);
 	}
 	
-	public static SBinMapType getMapType(Integer id, SBinJson sbinJson) {
+	public static SBinMapType getMapType(byte[] elementHex, SBinJson sbinJson) {
+		int id = HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, 0, 4));
 		SBinMapType type = mapTypes.getOrDefault(id, null);
 		if (type != null) { // Different files can have a varied header rules
+			if (type.getTypeId() == 0xF 
+					&& HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, 4, 8)) > 0xFF) {
+				return null; // Object of struct 0xF?
+			}
 			if (type.isEnumMap() && sbinJson.getEnums().isEmpty()) {
 				return null; 
 			}
@@ -33,6 +39,9 @@ public class SBinMapUtils {
 					|| !sbinJson.getStructs().get(0).getName().contentEquals("StringPair"))) {
 				return null; 
 			}
+//			if (type.isStructArray() && !DataUtils.checkForOverrideField(sbinJson, SBinFieldType.SUB_STRUCT)) {
+//				return null; // SubStruct enum is chosen just because of the same Id
+//			}
 		}
 		return type;
 	}

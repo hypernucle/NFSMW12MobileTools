@@ -268,7 +268,7 @@ public class SBin {
 		struBlock.setHeader(SBinBlockType.getBytes(SBinBlockType.STRU));
 		fielBlock.setHeader(SBinBlockType.getBytes(SBinBlockType.FIEL));
 		
-		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {
+		if (sbinJson.getSTRUHexStr() != null) {
 			struBlock.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getSTRUHexStr()));
 			fielBlock.setBlockBytes(HEXUtils.decodeHexStr(sbinJson.getFIELHexStr()));
 		} else {
@@ -280,34 +280,41 @@ public class SBin {
 				fielHexStream.write(HEXUtils.decodeHexStr(emptyFld.getHexValue()));
 				fieldId++;
 			}
-			boolean repeatFieldFromNextStructHack = false;
+			
+			String nextFieldName = "";
 			for (SBinStruct struct : sbinJson.getStructs()) {
 				struHexStream.write(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), struct.getName()));
 				boolean isFirstFieldPassed = false;
+				if (sbinJson.getStructs().indexOf(struct) + 1 < sbinJson.getStructs().size()) {
+					SBinStruct nextStruct = sbinJson.getStructs().get(sbinJson.getStructs().indexOf(struct) + 1);
+					if (struct.getFieldsArray().size() == 1) {
+						nextFieldName = nextStruct.getFieldsArray().get(0).getName();
+					}
+				}
 				
+				int fieldCount = 0;
 				for (SBinField field : struct.getFieldsArray()) {
 					if (!isFirstFieldPassed) {
 						struHexStream.write(HEXUtils.shortToBytes((short)fieldId));
 						isFirstFieldPassed = true;
-						if (repeatFieldFromNextStructHack && !field.isRepeatFieldFromNextStruct()) {
-							repeatFieldFromNextStructHack = false;
-							fieldId++;
-							continue; // Skip this field with Id increment
-						}
-						repeatFieldFromNextStructHack = field.isRepeatFieldFromNextStruct();
 					}
+					if (nextFieldName.contentEquals(field.getName())) {
+						System.out.println("same: " + field.getName());
+						nextFieldName = "";
+						continue;
+					}
+					System.out.println("added: " + field.getName());
 					fielHexStream.write(DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), field.getName()));
 					fielHexStream.write(HEXUtils.shortToBytes(
 							(short)SBinEnumUtils.getIdByStringName(field.getType())));
 					fielHexStream.write(HEXUtils.shortToBytes((short)field.getStartOffset()));
 					fielHexStream.write(HEXUtils.shortToBytes((short)field.getSpecOrderId()));
-					if (!repeatFieldFromNextStructHack) {
-						fieldId++;
-					}
+					fieldId++;
+					fieldCount++;
 				}
-				int countToNextStructInt = struct.getFieldsArray().size() - (repeatFieldFromNextStructHack ? 1 : 0);
-				byte[] countToNextStruct = HEXUtils.shortToBytes((short)countToNextStructInt);
+				byte[] countToNextStruct = HEXUtils.shortToBytes((short)fieldCount);
 				struHexStream.write(countToNextStruct);
+				nextFieldName = "";
 			}
 			struBlock.setBlockBytes(struHexStream.toByteArray());
 			fielBlock.setBlockBytes(fielHexStream.toByteArray());
@@ -371,12 +378,6 @@ public class SBin {
 		return entries;
 	}
 	
-	private void subLast2BytesOHDR(SBinBlockObj block) {
-		int index = block.getOHDRMapTemplate().size() - 1;
-		SBinOHDREntry lastOHDREntry = block.getOHDRMapTemplate().get(index);
-		lastOHDREntry.setValue(lastOHDREntry.getValue() - 0xE);
-	}
-	
 	private String getCDATStringByShortCHDRId(byte[] bytes, int startIndex, int endIndex, List<SBinCDATEntry> cdatStrings) {
 		int hexCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(bytes, startIndex, endIndex));
 		return cdatStrings.get(hexCHDRId).getString();
@@ -404,17 +405,15 @@ public class SBin {
 			
 			int firstFieldId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 2, 4));
 			int countToNextStruct = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 4, 6));
-			boolean repeatFieldFromNextStruct = false;
 			if (countToNextStruct == 0) {
 				countToNextStruct = 1;
-				repeatFieldFromNextStruct = true;
 			}
 			if (firstReadableField == 0 && firstFieldId > 0) {
 				firstReadableField = firstFieldId; // Read these unknown fields later
 			}
 			for (int i = 0; i < countToNextStruct; i++) {
 				struct.addToFields(readField(
-						sbinJson, fielBlock, i, firstFieldId, countToNextStruct, repeatFieldFromNextStruct));
+						sbinJson, fielBlock, i, firstFieldId, countToNextStruct));
 			}
 			//System.out.println("id: " + struct.getId() + ", name: " + struct.getName() + ", countToNextStruct: " + countToNextStruct + ", size real: " + struct.getFieldsArray().size());
 			struct.getFieldsArray().get(struct.getFieldsArray().size() - 1).setDynamicSize(true);
@@ -432,13 +431,13 @@ public class SBin {
 		}
 		if (firstReadableField != 0) {
 			for (int i = 0; i < firstReadableField; i++) {
-				sbinJson.addEmptyField(readField(sbinJson, fielBlock, i, 0, 0, false));
+				sbinJson.addEmptyField(readField(sbinJson, fielBlock, i, 0, 0));
 			}
 		}
  	}
 	
 	private SBinField readField(SBinJson sbinJson, SBinBlockObj fielBlock, 
-			int i, int firstFieldId, int fieldsCount, boolean repeatFieldFromNextStruct) {
+			int i, int firstFieldId, int fieldsCount) {
 		byte[] fieldHex = fielBlock.getBlockElements().get(firstFieldId + i);
 		SBinField fieldObj = new SBinField();
 		
@@ -463,7 +462,6 @@ public class SBin {
 		}
 		fieldObj.setFieldSize(getFieldSize(i, fieldsCount, fieldObj.getStartOffset(), fielBlock, firstFieldId));
 		fieldObj.setType(fieldEnumStr);
-		fieldObj.setRepeatFieldFromNextStruct(repeatFieldFromNextStruct);
 		
 		if (fieldObj.getFieldTypeEnum() != null 
 				&& fieldObj.getFieldTypeEnum().equals(SBinFieldType.ENUM_ID_INT32)) {
@@ -523,8 +521,7 @@ public class SBin {
 		
 		boolean isObjectKnown = false;
 		int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
-		SBinMapType mapType = SBinMapUtils.getMapType(
-				HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, 0, 4)), sbinJson);
+		SBinMapType mapType = SBinMapUtils.getMapType(elementHex, sbinJson);
 		if (mapType != null) {
 			processDataMap(elementHex, element, mapType, sbinJson);
 			isObjectKnown = true;
@@ -553,9 +550,9 @@ public class SBin {
 					
 					if (field.getFieldTypeEnum() != null && 
 							field.getFieldTypeEnum().equals(SBinFieldType.SUB_STRUCT)) {
-						readSubStructs(sbinJson, dataField, field, elementHex, element);
+						readSubStructs(sbinJson, dataField, field, elementHex, element, 0);
 					} else {
-						processDataFieldValue(field, null, dataField, elementHex, sbinJson, element);
+						processDataFieldValue(field, null, 0, dataField, elementHex, sbinJson, element);
 					}
 					fields.add(dataField);
 				}
@@ -570,7 +567,7 @@ public class SBin {
 	}
 	
 	private void readSubStructs(SBinJson sbinJson, SBinDataField dataField, 
-			SBinField field, byte[] elementHex, SBinDataElement element) {
+			SBinField field, byte[] elementHex, SBinDataElement element, int subStructOffset) {
 		List<SBinDataField> subFields = new ArrayList<>();
 		dataField.setSubStruct(field.getSubStruct());
 		SBinStruct struct = DataUtils.getStructByName(sbinJson, field.getSubStruct());
@@ -583,11 +580,17 @@ public class SBin {
 			if (subField.getFieldTypeEnum() != null && 
 					subField.getFieldTypeEnum().equals(SBinFieldType.SUB_STRUCT)) {
 				// there can be more than one Sub-Struct level
-				readSubStructs(sbinJson, subDataField, subField, elementHex, element);
+				if (subStructOffset == 0) {
+					subStructOffset = field.getStartOffset();
+				}
+				readSubStructs(sbinJson, subDataField, subField, elementHex, element, subStructOffset);
 			} else {
-				processDataFieldValue(subField, field, subDataField, elementHex, sbinJson, element);
+				processDataFieldValue(subField, field, subStructOffset, subDataField, elementHex, sbinJson, element);
 			}
 			subFields.add(subDataField);
+			if (element.getOrderHexId().contentEquals("0900")) {
+				System.out.println(struct.getFieldsArray().size() + ", " + subDataField.getType() + ", " + subDataField.getValue());
+			}
 		}
 		dataField.setSubFields(subFields);
 	}
@@ -598,12 +601,14 @@ public class SBin {
 	
 	// Element must be equal or longer than the sum of known Struct field sizes
 	private boolean isValidObject(int structId, SBinStruct struct, int elementLength) {
-		if (structId != 0) {return true;}
+		if (elementLength < 5) {return false;}
+//		if (structId != 0) {return true;}
 		int supposedLength = 0;
 		for (SBinField field : struct.getFieldsArray()) {
 			supposedLength += field.getFieldSize();
 		}
-		return elementLength > supposedLength;
+		if (elementLength > supposedLength + 0x8) {return false;}
+		return elementLength >= supposedLength;
 	}
 	
 	private void processDataMap(byte[] elementHex, SBinDataElement element, SBinMapType mapType, SBinJson sbinJson) {
@@ -671,12 +676,12 @@ public class SBin {
 		element.setFields(fields);
 	}
 	
-	private void processDataFieldValue(SBinField field, SBinField parentField, 
+	private void processDataFieldValue(SBinField field, SBinField parentField, int subStructOffset,
 			SBinDataField dataField, byte[] elementHex, SBinJson sbinJson, SBinDataElement element) {
 		// First two bytes is taken by Struct ID, start byte goes after
 		int startOffset = field.getStartOffset() + 2;
 		if (parentField != null) {
-			startOffset += parentField.getStartOffset();
+			startOffset += parentField.getStartOffset() + subStructOffset;
 		}
 		int fieldRealSize = field.getFieldSize();
 		if (field.isDynamicSize()) {
@@ -947,14 +952,10 @@ public class SBin {
 		else if (dataEntry.isStructObject()) { // Object from SBin
 			SBinStruct struct = getStructObject(sbinJson, dataEntry.getStructName());
 			dataElementStream.write(HEXUtils.shortToBytes((short)struct.getId()));
-			//
+			
 			for (SBinDataField dataField : dataEntry.getFields()) {
 				if (dataField.getSubStruct() != null) {
-					// TODO Support for nested sub-structs
-					SBinStruct subStruct = getStructObject(sbinJson, dataField.getSubStruct());
-					for (SBinDataField subField : dataField.getSubFields()) {
-						dataElementStream.write(fieldValueToBytes(subField, subStruct, sbinJson));
-					}
+					buildSubStructEntry(dataEntry.getOrderHexId(), sbinJson, dataField, dataElementStream);
 				} else {
 					dataElementStream.write(fieldValueToBytes(dataField, struct, sbinJson));
 				}
@@ -1013,17 +1014,31 @@ public class SBin {
 			for (SBinField field : struct.getFieldsArray()) {
 				if (field.getName().contentEquals(dataField.getName()) && !field.isDynamicSize()) {
 					fieldRealSize = field.getFieldSize();
-//					System.out.println(dataField.getName() + ", fieldRealSize: " + fieldRealSize);
+					//System.out.println(dataField.getName() + ", fieldRealSize: " + fieldRealSize);
 				}
 			}
 			byte[] convertedValue = SBinEnumUtils.convertValueByType(valueType, dataField, sbinJson, fieldRealSize);
 			dataFieldStream.write(convertedValue);
 			if (convertedValue.length != fieldRealSize) {
-//				System.out.println(dataField.getName() + ", add: " + (fieldRealSize - convertedValue.length));
+				//System.out.println(dataField.getType() + ", " + dataField.getName() + ", add: " + (fieldRealSize - convertedValue.length));
 				dataFieldStream.write(new byte[fieldRealSize - convertedValue.length]);
 			} 
 		}
 		return dataFieldStream.toByteArray();
+	}
+	
+	private void buildSubStructEntry(String hexId, SBinJson sbinJson, SBinDataField dataField, ByteArrayOutputStream dataElementStream) throws IOException {
+		SBinStruct subStruct = getStructObject(sbinJson, dataField.getSubStruct());
+		for (SBinDataField subField : dataField.getSubFields()) {
+			if (subField.getSubStruct() != null) {
+				buildSubStructEntry(hexId, sbinJson, subField, dataElementStream);
+			} else {
+				if (hexId.contentEquals("0900")) {
+					System.out.println(subField.getType());
+				}
+				dataElementStream.write(fieldValueToBytes(subField, subStruct, sbinJson));
+			}
+		}
 	}
 	
 	private byte[] preparePlaylistsDataForSBinBlock(SBinBlockObj block, SBinJson sbinJson) throws IOException {
