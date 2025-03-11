@@ -4,8 +4,8 @@ import util.LaunchParameters;
 
 public class main {
 
-	private static final String ABOUT = "NFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.14"
-			+ "\nUsage examples:"
+	private static final String ABOUT = "\tNFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.14"
+			+ "\n\tUsage examples:"
 			+ "\n\t# Music Playlists editor (full support):"
 			+ "\n\t\t'unpack playlists playlists.sb', 'repack playlists.sb.json'"
 			+ "\n\t# Basic SBin file repacker (DATA objects where possible + HEX-edits if you know what to do)."

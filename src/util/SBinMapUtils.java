@@ -4,8 +4,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import util.DataClasses.SBinJson;
-
 public class SBinMapUtils {
 	private SBinMapUtils() {}
 	
@@ -25,7 +23,7 @@ public class SBinMapUtils {
 		mapTypes.putIfAbsent(mapType.getTypeId(), mapType);
 	}
 	
-	public static SBinMapType getMapType(byte[] elementHex, SBinJson sbinJson) {
+	public static SBinMapType getMapType(byte[] elementHex) {
 		int id = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
 		SBinMapType type = mapTypes.getOrDefault(id, null);
 		// Different files can have a varied header rules
@@ -41,13 +39,13 @@ public class SBinMapUtils {
 					return null; // Object of struct 0xF? Something else?
 				}
 			}	
-			if (type.isEnumMap() && sbinJson.getEnums().isEmpty()) {
+			if (type.isEnumMap() && SBJson.get().getEnums().isEmpty()) {
 				return null; 
 			}
 			if (type.isStructArray()) {
-				boolean structsExists = sbinJson.getStructs() != null;
-				type.setStringTable(structsExists && sbinJson.getStructs().get(0).getName().contentEquals("StringPair"));
-				if (!structsExists || !DataUtils.checkForOverrideField(sbinJson, SBinFieldType.SUB_STRUCT)) {
+				boolean structsExists = SBJson.get().getStructs() != null;
+				type.setStringTable(structsExists && SBJson.get().getStructs().get(0).getName().contentEquals("StringPair"));
+				if (!structsExists || !DataUtils.checkForOverrideField(SBinFieldType.SUB_STRUCT)) {
 					return null; // SubStruct enum is chosen just because of the same Id
 				}
 			}

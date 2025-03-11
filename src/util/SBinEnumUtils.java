@@ -3,7 +3,6 @@ package util;
 import util.DataClasses.SBinDataField;
 import util.DataClasses.SBinEnum;
 import util.DataClasses.SBinField;
-import util.DataClasses.SBinJson;
 
 public class SBinEnumUtils {
 	
@@ -35,7 +34,7 @@ public class SBinEnumUtils {
 	}
 	
 	public static String formatFieldValueUnpack(
-			SBinField field, SBinDataField dataField, int fieldRealSize, byte[] valueHex, SBinJson sbinJson) {
+			SBinField field, SBinDataField dataField, int fieldRealSize, byte[] valueHex) {
 		String strValue;
 		// Try to handle int, boolean, float or CHDR ref with weird field size, but force last elements as a plain HEX to be safe
 		if (field.getFieldTypeEnum() == null ||
@@ -63,7 +62,7 @@ public class SBinEnumUtils {
 			}
 			break;
 		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
-			strValue = sbinJson.getCDATStrings().get(HEXUtils.twoLEByteArrayToInt(valueHex)).getString();
+			strValue = SBJson.get().getCDATStrings().get(HEXUtils.twoLEByteArrayToInt(valueHex)).getString();
 			break;
 		case INT8: case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			// U_INT8: Primarily used for HEX colors, left as it is
@@ -75,11 +74,11 @@ public class SBinEnumUtils {
 	}
 	
 	public static byte[] convertValueByType(
-			SBinFieldType type, SBinDataField dataField, SBinJson sbinJson, int fieldRealSize) {
+			SBinFieldType type, SBinDataField dataField, int fieldRealSize) {
 		byte[] value = new byte[0];
 		switch(type) {
 		case INT32: case U_INT32: case BULK_OFFSET_ID:
-			value = HEXUtils.intToByteArrayLE(Integer.parseInt(dataField.getValue()), 0x4);
+			value = HEXUtils.intToByteArrayLE(Integer.parseInt(dataField.getValue()));
 			break;
 		case FLOAT:
 			value = HEXUtils.floatToBytes(Float.parseFloat(dataField.getValue()));
@@ -96,10 +95,10 @@ public class SBinEnumUtils {
 			} 
 			break;
 		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
-			value = DataUtils.processStringInCDAT(sbinJson, dataField.getValue());
+			value = DataUtils.processStringInCDAT(dataField.getValue());
 			break;
 		case ENUM_ID_INT32:
-			value = getEnumValueBytes(sbinJson, dataField);
+			value = getEnumValueBytes(dataField);
 			break;
 		case INT8: case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			value = HEXUtils.decodeHexStr(dataField.getValue());
@@ -124,18 +123,18 @@ public class SBinEnumUtils {
 		}
 	}
 	
-	private static byte[] getEnumValueBytes(SBinJson sbinJson, SBinDataField dataField) {
+	private static byte[] getEnumValueBytes(SBinDataField dataField) {
 		int enumMapId = 0;
-		for (SBinEnum enumObj : sbinJson.getEnums()) {
+		for (SBinEnum enumObj : SBJson.get().getEnums()) {
 			if (enumObj.getName().contentEquals(dataField.getEnumJsonPreview())) {
 				enumMapId = HEXUtils.twoLEByteArrayToInt(
 						HEXUtils.decodeHexStr(enumObj.getDataIdMapRef()));
 			}
 		}
 		int i = 0;
-		for (String mapElement : sbinJson.getDataElements().get(enumMapId).getMapElements()) {
+		for (String mapElement : SBJson.get().getDataElements().get(enumMapId).getMapElements()) {
 			if (mapElement.contentEquals(dataField.getValue())) {
-				return HEXUtils.intToByteArrayLE(i, 0x4);
+				return HEXUtils.intToByteArrayLE(i);
 			}
 			i++;
 		}

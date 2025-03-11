@@ -28,7 +28,7 @@ public final class HEXUtils {
 	}
 
 	public static void writeBytesWithAddition(ByteArrayOutputStream hexStream, int baseValue, int addition) throws IOException {
-		hexStream.write(intToByteArrayLE(baseValue + addition, 0x4));
+		hexStream.write(intToByteArrayLE(baseValue + addition));
 	}
 
 	public static int byteArrayToInt(byte[] bytes) {
@@ -43,8 +43,8 @@ public final class HEXUtils {
 		return ((bytes[1] & 0xFF) << 8) | (bytes[0] & 0xFF);
 	}
 
-	public static byte[] intToByteArrayLE(int data, int size) {    
-		return ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN).putInt(data).array(); 
+	public static byte[] intToByteArrayLE(int data) {    
+		return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(data).array(); 
 	}
 
 	public static byte[] shortToBytes(int data) {
@@ -68,11 +68,11 @@ public final class HEXUtils {
 	}
 	
 	public static String setDataEntryHexId(int i, boolean longDataElementIds) {
-		return HEXUtils.hexToString(longDataElementIds ? HEXUtils.intToByteArrayLE(i, 0x4) : HEXUtils.shortToBytes(i));
+		return HEXUtils.hexToString(longDataElementIds ? HEXUtils.intToByteArrayLE(i) : HEXUtils.shortToBytes(i));
 	}
 	
 	public static byte[] setDataEntryHexIdBytes(int i, boolean longDataElementIds) {
-		return longDataElementIds ? HEXUtils.intToByteArrayLE(i, 0x4) : HEXUtils.shortToBytes(i);
+		return longDataElementIds ? HEXUtils.intToByteArrayLE(i) : HEXUtils.shortToBytes(i);
 	}
 
 	// Taken from StackOverflow (maybeWeCouldStealAVan)

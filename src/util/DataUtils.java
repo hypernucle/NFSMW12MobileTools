@@ -7,28 +7,27 @@ import util.DataClasses.SBinCDATEntry;
 import util.DataClasses.SBinDataElement;
 import util.DataClasses.SBinDataField;
 import util.DataClasses.SBinField;
-import util.DataClasses.SBinJson;
 import util.DataClasses.SBinStruct;
 
 public class DataUtils {
 	private DataUtils() {}
 	
-	public static byte[] processStringInCDAT(SBinJson sbinJson, String string) {
-		for (SBinCDATEntry cdatEntry : sbinJson.getCDATStrings()) {
+	public static byte[] processStringInCDAT(String string) {
+		for (SBinCDATEntry cdatEntry : SBJson.get().getCDATStrings()) {
 			if (cdatEntry.getString().contentEquals(string)) {
 				return HEXUtils.decodeHexStr(cdatEntry.getChdrHexId());
 			}
 		}
-		byte[] newCHDRId = HEXUtils.setDataEntryHexIdBytes(sbinJson.getCDATStrings().size(), sbinJson.isDataLongElementIds());
+		byte[] newCHDRId = HEXUtils.setDataEntryHexIdBytes(SBJson.get().getCDATStrings().size(), SBJson.get().isDataLongElementIds());
 		SBinCDATEntry newEntry = new SBinCDATEntry();
 		newEntry.setString(string);
 		newEntry.setChdrHexId(HEXUtils.hexToString(newCHDRId));
-		sbinJson.getCDATStrings().add(newEntry);
+		SBJson.get().getCDATStrings().add(newEntry);
 		return newCHDRId;
 	}
 	
-	public static SBinDataElement getDataElementByStructName(SBinJson sbinJson, String structName) {
-		for (SBinDataElement dataElement : sbinJson.getDataElements()) {
+	public static SBinDataElement getDataElementByStructName(String structName) {
+		for (SBinDataElement dataElement : SBJson.get().getDataElements()) {
 			if (dataElement.getStructName().contentEquals(structName)) {
 				return dataElement;
 			}
@@ -36,9 +35,9 @@ public class DataUtils {
 		return null;
 	}
 	
-	public static List<SBinDataElement> getAllDataElementsByStructName(SBinJson sbinJson, String structName) {
+	public static List<SBinDataElement> getAllDataElementsByStructName(String structName) {
 		List<SBinDataElement> elements = new ArrayList<>();
-		for (SBinDataElement dataElement : sbinJson.getDataElements()) {
+		for (SBinDataElement dataElement : SBJson.get().getDataElements()) {
 			if (dataElement.getStructName().contentEquals(structName)) {
 				elements.add(dataElement);
 			}
@@ -55,16 +54,16 @@ public class DataUtils {
 		return null;
 	}
 	
-	public static SBinDataElement getDataElementFromValueId(SBinJson sbinJson, SBinDataElement dataElement, String fieldName) {
+	public static SBinDataElement getDataElementFromValueId(SBinDataElement dataElement, String fieldName) {
 		SBinDataField lookForElement = DataUtils.getDataFieldByName(dataElement, fieldName);
 		if (lookForElement != null) {
-			return sbinJson.getDataElements().get(HEXUtils.strHexToInt(lookForElement.getValue()));
+			return SBJson.get().getDataElements().get(HEXUtils.strHexToInt(lookForElement.getValue()));
 		}
 		return null;
 	}
 	
-	public static SBinStruct getStructByName(SBinJson sbinJson, String name) {
-		for (SBinStruct struct : sbinJson.getStructs()) {
+	public static SBinStruct getStructByName(String name) {
+		for (SBinStruct struct : SBJson.get().getStructs()) {
 			if (struct.getName().contentEquals(name)) {
 				return struct;
 			}
@@ -72,8 +71,8 @@ public class DataUtils {
 		return null;
 	}
 	
-	public static boolean checkForOverrideField(SBinJson sbinJson, SBinFieldType type) {
-		for (SBinField field : sbinJson.getEmptyFields()) {
+	public static boolean checkForOverrideField(SBinFieldType type) {
+		for (SBinField field : SBJson.get().getEmptyFields()) {
 			if (field.getFieldTypeEnum().equals(type)) {
 				return true;
 			}

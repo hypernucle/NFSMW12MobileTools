@@ -10,7 +10,6 @@ import java.util.List;
 import jogl.DDSImage;
 import jogl.DDSImage.ImageInfo;
 import util.DataClasses.SBinDataElement;
-import util.DataClasses.SBinJson;
 import util.HEXClasses.SBinBlockObj;
 
 public class TextureUtils {
@@ -25,22 +24,22 @@ public class TextureUtils {
 	
 	private static int imageFormatId = DDSImage.D3DFMT_A8R8G8B8;
 	
-	public static void extractImage(SBinJson sbinJson, SBinBlockObj bulkBlock, byte[] bargBlock) throws IOException {
-		List<SBinDataElement> textures = DataUtils.getAllDataElementsByStructName(sbinJson, PARAM_TEXTURE);
+	public static void extractImage(SBinBlockObj bulkBlock, byte[] bargBlock) throws IOException {
+		List<SBinDataElement> textures = DataUtils.getAllDataElementsByStructName(PARAM_TEXTURE);
 		int i = 0;
 		for (SBinDataElement texParams : textures) {
 			int width = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_WIDTH).getValue());
 			int height = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_HEIGHT).getValue());
 			
 			// MipMap map comes after the Texture object
-			List<String> mipmapsList = getDATAMipmapsList(sbinJson, texParams);
+			List<String> mipmapsList = getDATAMipmapsList(texParams);
 			ByteBuffer[] mipMaps = new ByteBuffer[mipmapsList.size()];
 			boolean imageFormatChecked = false;
 			
 			int curMipmap = 0;
 			for (String dataMMId : mipmapsList) {
 				int dataId = HEXUtils.strHexToInt(dataMMId);
-				SBinDataElement mmLevel = sbinJson.getDataElements().get(dataId);
+				SBinDataElement mmLevel = SBJson.get().getDataElements().get(dataId);
 				if (!mmLevel.getStructName().contentEquals("Image")) {
 					System.out.println("!!! Mipmap level object structure is wrong or broken, DATA Id: " + dataId + ".");
 				}
@@ -70,13 +69,13 @@ public class TextureUtils {
 			}
 			DDSImage image = DDSImage.createFromData(imageFormatId, width, height, mipMaps);
 			String nameAddition = textures.size() > 1 ? "_" + i : "";
-			image.write(new File(sbinJson.getFileName() + nameAddition + ".dds"));
+			image.write(new File(SBJson.get().getFileName() + nameAddition + ".dds"));
 			i++;
 		}
 	}
 	
-	public static void repackImage(SBinBlockObj block, SBinJson sbinJson) throws IOException {
-		List<SBinDataElement> textures = DataUtils.getAllDataElementsByStructName(sbinJson, PARAM_TEXTURE);
+	public static void repackImage(SBinBlockObj block) throws IOException {
+		List<SBinDataElement> textures = DataUtils.getAllDataElementsByStructName(PARAM_TEXTURE);
 		ByteArrayOutputStream bulkMapStream = new ByteArrayOutputStream();
 		ByteArrayOutputStream imageHexStream = new ByteArrayOutputStream();
 		int bulkStartOffset = 0;
@@ -85,10 +84,10 @@ public class TextureUtils {
 		for (SBinDataElement texParams : textures) {
 			int width = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_WIDTH).getValue());
 			int height = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_HEIGHT).getValue());
-			SBinDataElement mmmap = DataUtils.getDataElementFromValueId(sbinJson, texParams, PARAM_MIPMAPS);
+			SBinDataElement mmmap = DataUtils.getDataElementFromValueId(texParams, PARAM_MIPMAPS);
 			
 			String nameAddition = textures.size() > 1 ? "_" + i : "";
-			DDSImage image = DDSImage.read(new File(sbinJson.getFileName() + nameAddition + ".dds"));
+			DDSImage image = DDSImage.read(new File(SBJson.get().getFileName() + nameAddition + ".dds"));
 			setCurrentImageFormat(image.getPixelFormat());
 			if (image.getWidth() != width || image.getHeight() != height) {
 				System.out.println("!!! Image width, height or format is not compatible with the SBin data - expect broken Output file.");
@@ -97,7 +96,7 @@ public class TextureUtils {
 			int curMipmap = 0;
 			for (String dataMMId : mmmap.getMapElements()) {
 				int dataId = HEXUtils.strHexToInt(dataMMId);
-				SBinDataElement mmLevel = sbinJson.getDataElements().get(dataId);
+				SBinDataElement mmLevel = SBJson.get().getDataElements().get(dataId);
 				int mmLevelWidth = Integer.parseInt(DataUtils.getDataFieldByName(mmLevel, PARAM_WIDTH).getValue());
 				int mmLevelHeight = Integer.parseInt(DataUtils.getDataFieldByName(mmLevel, PARAM_HEIGHT).getValue());
 				String format = DataUtils.getDataFieldByName(mmLevel, PARAM_FORMAT).getValue();
@@ -114,10 +113,10 @@ public class TextureUtils {
 				imageHexStream.write(
 						processMipmapImageOperations(mipmapBytes, mmLevelWidth, mmLevelHeight, false));
 				
-				bulkMapStream.write(HEXUtils.intToByteArrayLE(bulkStartOffset, 0x4));
+				bulkMapStream.write(HEXUtils.intToByteArrayLE(bulkStartOffset));
 				bulkStartOffset += mipmapBytes.length;
 				int offsetAddition = bulkStartOffset - (bulkStartOffset - mipmapBytes.length);
-				bulkMapStream.write(HEXUtils.intToByteArrayLE(offsetAddition, 0x4));
+				bulkMapStream.write(HEXUtils.intToByteArrayLE(offsetAddition));
 				curMipmap++;
 			}
 			i++;
@@ -128,8 +127,8 @@ public class TextureUtils {
 	
 	//
 	
-	private static List<String> getDATAMipmapsList(SBinJson sbinJson, SBinDataElement texParams) {
-		SBinDataElement mmmap = DataUtils.getDataElementFromValueId(sbinJson, texParams, PARAM_MIPMAPS);
+	private static List<String> getDATAMipmapsList(SBinDataElement texParams) {
+		SBinDataElement mmmap = DataUtils.getDataElementFromValueId(texParams, PARAM_MIPMAPS);
 		return LaunchParameters.isMipmapUnpackDisabled() ? mmmap.getMapElements().subList(0, 1) : mmmap.getMapElements();
 	}
 	

@@ -60,10 +60,10 @@ public final class DataClasses {
 			this.fileName = fileName;
 		}
 		
-		public int getSbinVersion() {
+		public int getSBinVersion() {
 			return sbinVersion;
 		}
-		public void setSbinVersion(int sbinVersion) {
+		public void setSBinVersion(int sbinVersion) {
 			this.sbinVersion = sbinVersion;
 		}
 		
