@@ -96,7 +96,7 @@ public class SBinEnumUtils {
 			} 
 			break;
 		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
-			value = DataUtils.processStringInCDAT(sbinJson.getCDATStrings(), dataField.getValue());
+			value = DataUtils.processStringInCDAT(sbinJson, dataField.getValue());
 			break;
 		case ENUM_ID_INT32:
 			value = getEnumValueBytes(sbinJson, dataField);

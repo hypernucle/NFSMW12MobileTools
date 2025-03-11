@@ -27,6 +27,8 @@ public final class DataClasses {
 		private String ohdrHexStr; 
 		@SerializedName("DATA_HexStr")
 		private String dataHexStr; 
+		@SerializedName("DATA_LongElementIds")
+		private boolean dataLongElementIds = false;
 		@SerializedName("CHDR_HexStr")
 		private String chdrHexStr; 
 		@SerializedName("CDAT_HexStr")
@@ -112,6 +114,13 @@ public final class DataClasses {
 		}
 		public void setDATAHexStr(String dataHexStr) {
 			this.dataHexStr = dataHexStr;
+		}
+		
+		public boolean isDataLongElementIds() {
+			return dataLongElementIds;
+		}
+		public void setDataLongElementIds(boolean dataLongElementIds) {
+			this.dataLongElementIds = dataLongElementIds;
 		}
 		
 		public String getCHDRHexStr() {
@@ -387,16 +396,16 @@ public final class DataClasses {
 	public static class SBinDataElement {
 		@SerializedName("OrderHexId")
 		private String orderHexId; // Only for info
-		@SerializedName("OHDRUnkRemainder")
-		private int ohdrUnkRemainder = 0;
+		@SerializedName("OHDRPadRemainder")
+		private int ohdrPadRemainder = 0;
 		@SerializedName("HexValue")
 		private String hexValue;
 		@SerializedName("ExtraHexValue")
 		private String extraHexValue;
 		@SerializedName("StructName")
 		private String structName;
-		@SerializedName("StructObject")
-		private boolean structObject = false;
+		@SerializedName("GlobalType")
+		private SBinDataGlobalType globalType = SBinDataGlobalType.UNKNOWN;
 		@SerializedName("MapElements")
 		private List<String> mapElements;
 		@SerializedName("StringData")
@@ -411,11 +420,11 @@ public final class DataClasses {
 			this.orderHexId = orderHexId;
 		}
 		
-		public int getOhdrUnkRemainder() {
-			return ohdrUnkRemainder;
+		public int getOhdrPadRemainder() {
+			return ohdrPadRemainder;
 		}
-		public void setOhdrUnkRemainder(int ohdrUnkRemainder) {
-			this.ohdrUnkRemainder = ohdrUnkRemainder;
+		public void setOhdrPadRemainder(int ohdrPadRemainder) {
+			this.ohdrPadRemainder = ohdrPadRemainder;
 		}
 		
 		public String getHexValue() {
@@ -439,11 +448,11 @@ public final class DataClasses {
 			this.structName = structName;
 		}
 		
-		public boolean isStructObject() {
-			return structObject;
+		public SBinDataGlobalType getGlobalType() {
+			return globalType;
 		}
-		public void setStructObject(boolean structObject) {
-			this.structObject = structObject;
+		public void setGlobalType(SBinDataGlobalType globalType) {
+			this.globalType = globalType;
 		}
 		
 		public List<SBinStringPair> getStringData() {

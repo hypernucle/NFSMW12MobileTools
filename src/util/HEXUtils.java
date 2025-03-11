@@ -66,6 +66,14 @@ public final class HEXUtils {
 	public static byte[] doubleToBytes(double value) {  
 	     return ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putDouble(value).array();
 	}
+	
+	public static String setDataEntryHexId(int i, boolean longDataElementIds) {
+		return HEXUtils.hexToString(longDataElementIds ? HEXUtils.intToByteArrayLE(i, 0x4) : HEXUtils.shortToBytes(i));
+	}
+	
+	public static byte[] setDataEntryHexIdBytes(int i, boolean longDataElementIds) {
+		return longDataElementIds ? HEXUtils.intToByteArrayLE(i, 0x4) : HEXUtils.shortToBytes(i);
+	}
 
 	// Taken from StackOverflow (maybeWeCouldStealAVan)
 	public static String hexToString(byte[] bytes) {

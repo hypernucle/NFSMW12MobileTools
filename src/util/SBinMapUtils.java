@@ -11,13 +11,14 @@ public class SBinMapUtils {
 	
 	public static final int HEADERENTRY_SIZE = 0x4;
 	public static final int HEADERFULL_SIZE = 0x8;
+	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
 	
 	private static Map<Integer, SBinMapType> mapTypes = new HashMap<>();
 	
 	public static void initMapTypes() {
 		addMapType(new SBinMapType(0xD, "EnumMap", 0x2, true, false, true));
 		addMapType(new SBinMapType(0xF, "DataIdsMap", 0x4, false, false, false));
-		addMapType(new SBinMapType(0x10, "StringTable", 0x8, false, true, false));
+		addMapType(new SBinMapType(0x10, "StructArray", 0x8, false, true, false));
 	}
 	
 	private static void addMapType(SBinMapType mapType) {
@@ -25,23 +26,31 @@ public class SBinMapUtils {
 	}
 	
 	public static SBinMapType getMapType(byte[] elementHex, SBinJson sbinJson) {
-		int id = HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, 0, 4));
+		int id = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
 		SBinMapType type = mapTypes.getOrDefault(id, null);
-		if (type != null) { // Different files can have a varied header rules
-			if (type.getTypeId() == 0xF 
-					&& HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, 4, 8)) > 0xFF) {
-				return null; // Object of struct 0xF?
+		// Different files can have a varied header rules
+		if (type != null) { 
+			if (!type.isStructArray() && !Arrays.equals(Arrays.copyOfRange(elementHex, 2, 4), SHORTBYTE_EMPTY)) {
+				return null; // Struct Array header is 2 bytes, with other 2 bytes indicating Struct Id
 			}
+			if (type.getTypeId() == 0xF) {
+				int mapCount = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 4, 6));
+				if (HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 6, 8)) != 0x0
+						|| mapCount > 0x1000  
+						|| (mapCount == 0x0 && elementHex.length > 0x10) ) {
+					return null; // Object of struct 0xF? Something else?
+				}
+			}	
 			if (type.isEnumMap() && sbinJson.getEnums().isEmpty()) {
 				return null; 
 			}
-			if (type.isStringDataMap() && (sbinJson.getStructs() == null 
-					|| !sbinJson.getStructs().get(0).getName().contentEquals("StringPair"))) {
-				return null; 
+			if (type.isStructArray()) {
+				boolean structsExists = sbinJson.getStructs() != null;
+				type.setStringTable(structsExists && sbinJson.getStructs().get(0).getName().contentEquals("StringPair"));
+				if (!structsExists || !DataUtils.checkForOverrideField(sbinJson, SBinFieldType.SUB_STRUCT)) {
+					return null; // SubStruct enum is chosen just because of the same Id
+				}
 			}
-//			if (type.isStructArray() && !DataUtils.checkForOverrideField(sbinJson, SBinFieldType.SUB_STRUCT)) {
-//				return null; // SubStruct enum is chosen just because of the same Id
-//			}
 		}
 		return type;
 	}
@@ -62,16 +71,17 @@ public class SBinMapUtils {
 		private String typeName;
 		private int entrySize;
 		private boolean isEnumMap;
-		private boolean isStringDataMap;
+		private boolean isStructArray;
 		private boolean cdatEntries;
+		private boolean isStringTable = false;
 		
 		public SBinMapType(int typeId, String typeName, int entrySize,
-				boolean isEnumMap, boolean isStringDataMap, boolean cdatEntries) {
+				boolean isEnumMap, boolean isStructArray, boolean cdatEntries) {
 			this.typeId = typeId;
 			this.typeName = typeName;
 			this.entrySize = entrySize;
 			this.isEnumMap = isEnumMap;
-			this.isStringDataMap = isStringDataMap;
+			this.isStructArray = isStructArray;
 			this.cdatEntries = cdatEntries;
 		}
 		
@@ -103,11 +113,11 @@ public class SBinMapUtils {
 			this.isEnumMap = isEnumMap;
 		}
 
-		public boolean isStringDataMap() {
-			return isStringDataMap;
+		public boolean isStructArray() {
+			return isStructArray;
 		}
-		public void setStringDataMap(boolean isStringDataMap) {
-			this.isStringDataMap = isStringDataMap;
+		public void setStructArray(boolean isStructArray) {
+			this.isStructArray = isStructArray;
 		}
 
 		public boolean isCDATEntries() {
@@ -117,5 +127,13 @@ public class SBinMapUtils {
 			this.cdatEntries = cdatEntries;
 		}
 		
+		//
+		
+		public boolean isStringTable() {
+			return isStringTable;
+		}
+		public void setStringTable(boolean isStringTable) {
+			this.isStringTable = isStringTable;
+		}
 	}
 }

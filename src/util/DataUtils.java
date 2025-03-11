@@ -13,17 +13,17 @@ import util.DataClasses.SBinStruct;
 public class DataUtils {
 	private DataUtils() {}
 	
-	public static byte[] processStringInCDAT(List<SBinCDATEntry> cdatList, String string) {
-		for (SBinCDATEntry cdatEntry : cdatList) {
+	public static byte[] processStringInCDAT(SBinJson sbinJson, String string) {
+		for (SBinCDATEntry cdatEntry : sbinJson.getCDATStrings()) {
 			if (cdatEntry.getString().contentEquals(string)) {
 				return HEXUtils.decodeHexStr(cdatEntry.getChdrHexId());
 			}
 		}
-		byte[] newCHDRId = HEXUtils.shortToBytes(cdatList.size());
+		byte[] newCHDRId = HEXUtils.setDataEntryHexIdBytes(sbinJson.getCDATStrings().size(), sbinJson.isDataLongElementIds());
 		SBinCDATEntry newEntry = new SBinCDATEntry();
 		newEntry.setString(string);
 		newEntry.setChdrHexId(HEXUtils.hexToString(newCHDRId));
-		cdatList.add(newEntry);
+		sbinJson.getCDATStrings().add(newEntry);
 		return newCHDRId;
 	}
 	
