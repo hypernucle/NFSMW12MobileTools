@@ -338,6 +338,7 @@ public class SBin {
 				SBinDataField dataField = new SBinDataField();
 				dataField.setName(field.getName());
 				dataField.setType(field.getType());
+				getFieldSize(dataField, field, elementHex.length - 0x2);
 				if (field.getFieldTypeEnum() != null &&
 						field.getFieldTypeEnum().equals(SBinFieldType.ENUM_ID_INT32)) {
 					dataField.setEnumJsonPreview(field.getEnumJsonPreview());
@@ -346,7 +347,7 @@ public class SBin {
 				
 				if (field.getFieldTypeEnum() != null && 
 						field.getFieldTypeEnum().equals(SBinFieldType.SUB_STRUCT)) {
-					readSubStructs(dataField, field, elementHex, element, 0);
+					readSubStructs(dataField, field, elementHex, element, 0, dataField.getFieldSize());
 				} else {
 					processDataFieldValue(field, null, 0, dataField, elementHex, element);
 				}
@@ -360,8 +361,16 @@ public class SBin {
 		}
 	}
 	
+	private void getFieldSize(SBinDataField dataField, SBinField field, int elementSize) {
+		int fieldSize = field.getFieldSize();
+		if (field.isDynamicSize()) { // Fields with unknown size is always last
+			fieldSize = elementSize - field.getStartOffset();
+		}
+		dataField.setFieldSize(fieldSize);
+	}
+	
 	private void readSubStructs(SBinDataField dataField, 
-			SBinField field, byte[] elementHex, SBinDataElement element, int subStructOffset) {
+			SBinField field, byte[] elementHex, SBinDataElement element, int subStructOffset, int rootStructSize) {
 		List<SBinDataField> subFields = new ArrayList<>();
 		dataField.setSubStruct(field.getSubStruct());
 		SBinStruct struct = DataUtils.getStructByName(field.getSubStruct());
@@ -370,6 +379,7 @@ public class SBin {
 			SBinDataField subDataField = new SBinDataField();
 			subDataField.setName(subField.getName());
 			subDataField.setType(subField.getType());
+			getFieldSize(subDataField, subField, dataField.getFieldSize());
 			
 			if (subField.getFieldTypeEnum() != null && 
 					subField.getFieldTypeEnum().equals(SBinFieldType.SUB_STRUCT)) {
@@ -377,7 +387,7 @@ public class SBin {
 				if (subStructOffset == 0) {
 					subStructOffset = field.getStartOffset();
 				}
-				readSubStructs(subDataField, subField, elementHex, element, subStructOffset);
+				readSubStructs(subDataField, subField, elementHex, element, subStructOffset, rootStructSize);
 			} else {
 				processDataFieldValue(subField, field, subStructOffset, subDataField, elementHex, element);
 			}
@@ -412,28 +422,13 @@ public class SBin {
 		if (parentField != null) {
 			startOffset += parentField.getStartOffset() + subStructOffset;
 		}
-		int fieldRealSize = field.getFieldSize();
-		if (field.isDynamicSize()) {
-			if (parentField != null && !parentField.isDynamicSize()) { // If not last, we could get full Struct size from parent Struct
-				fieldRealSize = parentField.getFieldSize() - field.getStartOffset();
-			} else {
-				fieldRealSize = elementHex.length - startOffset;
-				int fieldStandardSize = SBinEnumUtils.getFieldStandardSize(field.getFieldTypeEnum());
-				
-				if (field.getFieldTypeEnum() != null && fieldStandardSize < fieldRealSize) {
-					int paddingSize = elementHex.length - startOffset - fieldStandardSize;
-					fieldRealSize -= paddingSize;
-					element.setExtraHexValue(HEXUtils.hexToString(
-							Arrays.copyOfRange(elementHex, startOffset + fieldRealSize, elementHex.length)));
-				} 
-			}
-		}
-		try { // Some files can be just too complex & different
-			byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + fieldRealSize);
-			dataField.setValue(
-					SBinEnumUtils.formatFieldValueUnpack(field, dataField, fieldRealSize, valueHex));
-		} catch(ArrayIndexOutOfBoundsException | IllegalArgumentException ex) {
-			handleUnknownDATAHex(field, fieldRealSize, dataField, elementHex, element.getOrderHexId());
+
+		try { // Some files can be just too complex and/or different. Should not happen though
+			byte[] valueHex = Arrays.copyOfRange(elementHex, startOffset, startOffset + dataField.getFieldSize());
+			dataField.setValue(SBinEnumUtils.formatFieldValueUnpack(field, dataField, valueHex));
+			//
+		} catch (ArrayIndexOutOfBoundsException | IllegalArgumentException ex) {
+			handleUnknownDATAHex(field, dataField.getFieldSize(), dataField, elementHex, element.getOrderHexId());
 		}
 	}
 	
@@ -664,7 +659,8 @@ public class SBin {
 	}
 	
 	private void detectElementStruct(byte[] elementHex, int i, SBinDataElement element) {
-		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {
+		if (LaunchParameters.isDATAObjectsUnpackDisabled() 
+				|| hardcodedExceptionsForSomeDATAElements(elementHex, i)) {
 			element.setGlobalType(SBinDataGlobalType.UNKNOWN);
 			return;
 		}
@@ -677,7 +673,7 @@ public class SBin {
 			// TODO
 			element.setGlobalType(mapType.isStructArray() ? SBinDataGlobalType.UNKNOWN : SBinDataGlobalType.MAP);
 		} 
-		else if (i == 0 && elementHex.length == 0x12) {
+		else if (i == 0 && (elementHex.length == 0x10 || elementHex.length == 0x12) ) {
 			// The first DATA element is probably some unique structure, but we parse it too since it contains one of CDAT strings
 			// TODO Some files have different DATA structure even with objects (e.g car configs)
 			processFirstDATAEntry(elementHex, element);
@@ -759,6 +755,19 @@ public class SBin {
 		hex2.setForcedHexValue(true);
 		fields.add(hex2);
 		element.setFields(fields);
+	}
+	
+	private boolean hardcodedExceptionsForSomeDATAElements(byte[] elementHex, int i) {
+		boolean isLayoutsFile = SBJson.get().getFileName().contentEquals("layouts.sb");
+		//
+		int header = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
+		if (isLayoutsFile) {
+			if (header == 0x5 || // Doesn't fit Struct #5, looks like 0xF map instead
+				i != 0 && header == 0x1) { // Doesn't fit Struct #1, it was re-used for StructArray primarily
+				return true; 
+			}
+		}
+		return false;
 	}
 	
 	private void prepareCDATStrings(List<byte[]> chdrEntries, byte[] cdatBytes) {
@@ -925,7 +934,7 @@ public class SBin {
 		for (int i = 0; i < dataBlock.getOHDRMapTemplate().size() - 1; i++) {
 			SBinOHDREntry entry = dataBlock.getOHDRMapTemplate().get(i);
 			int entryLength = entry.getValue();
-			// I don't know why some of OHDR entries have a small remainder in values.
+			// Some of OHDR entries have a small remainder in values, related to 4-byte alignment
 			// Adding it as it is works well, usually
 			ohdrByteLength += entryLength;
 			ohdrHexStream.write(HEXUtils.intToByteArrayLE(ohdrByteLength + entry.getRemainder()));
@@ -1036,26 +1045,27 @@ public class SBin {
 	}
 	
 	private byte[] fieldValueToBytes(SBinDataField dataField, SBinStruct struct) throws IOException {
-		ByteArrayOutputStream dataFieldStream = new ByteArrayOutputStream();
 		if (dataField.isForcedHexValue()) {
-			dataFieldStream.write(HEXUtils.decodeHexStr(dataField.getValue()));
-		} else { // Non-HEX value here means that we know it's type
+			return HEXUtils.decodeHexStr(dataField.getValue());
+		} 
+		else { // Non-HEX value here means that we know it's type
+			ByteArrayOutputStream dataFieldStream = new ByteArrayOutputStream();
 			SBinFieldType valueType = SBinFieldType.valueOf(dataField.getType());
-			int fieldRealSize = SBinEnumUtils.getFieldStandardSize(valueType); 
-			for (SBinField field : struct.getFieldsArray()) {
-				if (field.getName().contentEquals(dataField.getName()) && !field.isDynamicSize()) {
-					fieldRealSize = field.getFieldSize();
-					//System.out.println(dataField.getName() + ", fieldRealSize: " + fieldRealSize);
-				}
-			}
-			byte[] convertedValue = SBinEnumUtils.convertValueByType(valueType, dataField, fieldRealSize);
+//			int fieldRealSize = SBinEnumUtils.getFieldStandardSize(valueType); 
+//			for (SBinField field : struct.getFieldsArray()) {
+//				if (field.getName().contentEquals(dataField.getName()) && !field.isDynamicSize()) {
+//					fieldRealSize = field.getFieldSize();
+//					//System.out.println(dataField.getName() + ", fieldRealSize: " + fieldRealSize);
+//				}
+//			}
+			byte[] convertedValue = SBinEnumUtils.convertValueByType(valueType, dataField, dataField.getFieldSize());
 			dataFieldStream.write(convertedValue);
-			if (convertedValue.length != fieldRealSize) {
-				//System.out.println(dataField.getType() + ", " + dataField.getName() + ", add: " + (fieldRealSize - convertedValue.length));
-				dataFieldStream.write(new byte[fieldRealSize - convertedValue.length]);
-			} 
+//			if (convertedValue.length != dataField.getFieldSize()) {
+//				//System.out.println(dataField.getType() + ", " + dataField.getName() + ", add: " + (fieldRealSize - convertedValue.length));
+//				dataFieldStream.write(new byte[dataField.getFieldSize() - convertedValue.length]);
+//			} 
+			return dataFieldStream.toByteArray();
 		}
-		return dataFieldStream.toByteArray();
 	}
 	
 	private void buildSubStructEntry(String hexId, SBinDataField dataField, ByteArrayOutputStream dataElementStream) throws IOException {

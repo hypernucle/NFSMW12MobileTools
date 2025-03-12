@@ -490,6 +490,8 @@ public final class DataClasses {
 		private Long enumDataMapIdJsonPreview;
 		@SerializedName("ForcedHexValue")
 		private boolean forcedHexValue;
+		@SerializedName("FieldSize")
+		private int fieldSize = 0;
 		@SerializedName("Value")
 		private String value;
 		@SerializedName("SubFields")
@@ -535,6 +537,13 @@ public final class DataClasses {
 		}
 		public void setForcedHexValue(boolean forcedHexValue) {
 			this.forcedHexValue = forcedHexValue;
+		}
+		
+		public int getFieldSize() {
+			return fieldSize;
+		}
+		public void setFieldSize(int fieldSize) {
+			this.fieldSize = fieldSize;
 		}
 		
 		public String getValue() {

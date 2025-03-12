@@ -47,6 +47,9 @@ public final class HEXUtils {
 		return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(data).array(); 
 	}
 
+	public static float bytesToShort(byte[] bytes) {
+		return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getShort();
+	}
 	public static byte[] shortToBytes(int data) {
 		return ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN).putShort((short)data).array();
 	}
@@ -54,7 +57,6 @@ public final class HEXUtils {
 	public static float bytesToFloat(byte[] bytes) {
 		return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getFloat();
 	}
-	
 	public static byte[] floatToBytes(float value) {  
 	     return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putFloat(value).array();
 	}
@@ -62,7 +64,6 @@ public final class HEXUtils {
 	public static double bytesToDouble(byte[] bytes) {
 	    return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getDouble();
 	}
-	
 	public static byte[] doubleToBytes(double value) {  
 	     return ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putDouble(value).array();
 	}

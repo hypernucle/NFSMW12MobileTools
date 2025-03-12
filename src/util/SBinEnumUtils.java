@@ -1,5 +1,9 @@
 package util;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+
 import util.DataClasses.SBinDataField;
 import util.DataClasses.SBinEnum;
 import util.DataClasses.SBinField;
@@ -19,33 +23,41 @@ public class SBinEnumUtils {
 		case INT8: case U_INT8:
 			size = 0x1;
 			break;
-		case BOOLEAN: case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
+		case INT16: case U_INT16:
 			size = 0x2;
 			break;
-		case INT32: case U_INT32: case FLOAT: case DATA_ID_REF: case DATA_ID_MAP: case ENUM_ID_INT32: case BULK_OFFSET_ID:
+		case INT32: case U_INT32: case FLOAT: case ENUM_ID_INT32: case BULK_OFFSET_ID:
 			size = 0x4;
 			break;
 		case DOUBLE:
 			size = 0x8;
 			break;
-		default: break;
+		default: case BOOLEAN: case DATA_ID_REF: case DATA_ID_MAP: 
+			case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF: break;
 		}
 		return size;
 	}
 	
-	public static String formatFieldValueUnpack(
-			SBinField field, SBinDataField dataField, int fieldRealSize, byte[] valueHex) {
-		String strValue;
-		// Try to handle int, boolean, float or CHDR ref with weird field size, but force last elements as a plain HEX to be safe
-		if (field.getFieldTypeEnum() == null ||
-				( getFieldStandardSize(field.getFieldTypeEnum()) != fieldRealSize && field.isDynamicSize()) ) {
+	public static String formatFieldValueUnpack(SBinField field, SBinDataField dataField, byte[] valueHex) {
+		if (field.getFieldTypeEnum() != null) {
+			int fieldStandardSize = getFieldStandardSize(field.getFieldTypeEnum());
+			// Try to handle values with weird field size - probably the object or type has been detected wrong
+			if (fieldStandardSize != 0x0 && fieldStandardSize != valueHex.length) {
+				return getDefaultHEXString(valueHex, dataField);
+			}
+		} else {
 			return getDefaultHEXString(valueHex, dataField);
 		}
+		
+		String strValue;
 		switch(field.getFieldTypeEnum()) {
 		case INT32: case U_INT32: case ENUM_ID_INT32: case BULK_OFFSET_ID:
 			// ENUM_ID_INT32: Enum stores all values on the last elements of DATA block, 
 			// so we read their values on other function.
 			strValue = String.valueOf(HEXUtils.byteArrayToInt(valueHex));
+			break;
+		case INT16: case U_INT16:
+			strValue = String.valueOf(HEXUtils.bytesToShort(valueHex));
 			break;
 		case FLOAT:
 			strValue = String.valueOf(HEXUtils.bytesToFloat(valueHex));
@@ -61,8 +73,10 @@ public class SBinEnumUtils {
 				strValue = getDefaultHEXString(valueHex, dataField);
 			}
 			break;
-		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
-			strValue = SBJson.get().getCDATStrings().get(HEXUtils.twoLEByteArrayToInt(valueHex)).getString();
+		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF: 
+			// CHDR usually is 2 bytes long. Symbol CHDR can be up to 4 bytes
+			byte[] firstTwoBytes = Arrays.copyOfRange(valueHex, 0, 2);
+			strValue = SBJson.get().getCDATStrings().get(HEXUtils.twoLEByteArrayToInt(firstTwoBytes)).getString();
 			break;
 		case INT8: case U_INT8: case DATA_ID_REF: case DATA_ID_MAP: default: 
 			// U_INT8: Primarily used for HEX colors, left as it is
@@ -74,7 +88,7 @@ public class SBinEnumUtils {
 	}
 	
 	public static byte[] convertValueByType(
-			SBinFieldType type, SBinDataField dataField, int fieldRealSize) {
+			SBinFieldType type, SBinDataField dataField, int fieldRealSize) throws IOException {
 		byte[] value = new byte[0];
 		switch(type) {
 		case INT32: case U_INT32: case BULK_OFFSET_ID:
@@ -89,13 +103,19 @@ public class SBinEnumUtils {
 		case BOOLEAN: 
 			boolean bool = Boolean.parseBoolean(dataField.getValue());
 			int boolInt = bool ? 1 : 0;
-			value = HEXUtils.shortToBytes((short)boolInt);
-			if (fieldRealSize == 1) {
-				value = new byte[]{value[0]};
-			} 
+			ByteArrayOutputStream boolValueStream = new ByteArrayOutputStream();
+			boolValueStream.write((byte)boolInt);
+			boolValueStream.write(new byte[fieldRealSize - 0x1]);
+			value = boolValueStream.toByteArray();
 			break;
 		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
 			value = DataUtils.processStringInCDAT(dataField.getValue());
+			if (fieldRealSize > 0x2) {
+				ByteArrayOutputStream valueStream = new ByteArrayOutputStream();
+				valueStream.write(value);
+				valueStream.write(new byte[fieldRealSize - value.length]);
+				value = valueStream.toByteArray();
+			}
 			break;
 		case ENUM_ID_INT32:
 			value = getEnumValueBytes(dataField);
