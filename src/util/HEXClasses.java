@@ -465,5 +465,76 @@ public final class HEXClasses {
 			this.padding = padding;
 		}
 	}
+	
+	public static class ETC1PKMTexture {
+		private byte[] header = HEXUtils.stringToBytes("PKM 10");
+		private byte[] type = new byte[2]; // ETC1_RGB_NO_MIPMAPS
+		private byte[] encWidth;
+		private byte[] encHeight;
+		private byte[] width;
+		private byte[] height;
+		private byte[] imageData;
+		
+		public byte[] toByteArray() throws IOException {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			bytes.write(this.header);
+			bytes.write(this.type);
+			bytes.write(this.encWidth);
+			bytes.write(this.encHeight);
+			bytes.write(this.width);
+			bytes.write(this.height);
+			bytes.write(this.imageData);
+			return bytes.toByteArray();
+		}
+		
+		public byte[] getHeader() {
+			return header;
+		}
+		public void setHeader(byte[] header) {
+			this.header = header;
+		}
+		
+		public byte[] getType() {
+			return type;
+		}
+		public void setType(byte[] type) {
+			this.type = type;
+		}
+		
+		public byte[] getEncWidth() {
+			return encWidth;
+		}
+		public void setEncWidth(byte[] encWidth) {
+			this.encWidth = encWidth;
+		}
+		
+		public byte[] getEncHeight() {
+			return encHeight;
+		}
+		public void setEncHeight(byte[] encHeight) {
+			this.encHeight = encHeight;
+		}
+		
+		public byte[] getWidth() {
+			return width;
+		}
+		public void setWidth(byte[] width) {
+			this.width = width;
+		}
+		
+		public byte[] getHeight() {
+			return height;
+		}
+		public void setHeight(byte[] height) {
+			this.height = height;
+		}
+		
+		public byte[] getImageData() {
+			return imageData;
+		}
+		public void setImageData(byte[] imageData) {
+			this.imageData = imageData;
+		}
+	}
 
 }

@@ -4,12 +4,15 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import util.DataClasses.SBinField;
+
 public class SBinMapUtils {
 	private SBinMapUtils() {}
 	
 	public static final int HEADERENTRY_SIZE = 0x4;
 	public static final int HEADERFULL_SIZE = 0x8;
 	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
+	public static final String STRUCT_ARRAY_RULE = "StructArrayRule";
 	
 	private static Map<Integer, SBinMapType> mapTypes = new HashMap<>();
 	
@@ -26,28 +29,22 @@ public class SBinMapUtils {
 	public static SBinMapType getMapType(byte[] elementHex) {
 		int id = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
 		SBinMapType type = mapTypes.getOrDefault(id, null);
+		if (type == null) {return type;}
+		
 		// Different files can have a varied header rules
-		if (type != null) { 
-			if (!type.isStructArray() && !Arrays.equals(Arrays.copyOfRange(elementHex, 2, 4), SHORTBYTE_EMPTY)) {
-				return null; // Struct Array header is 2 bytes, with other 2 bytes indicating Struct Id
-			}
-			if (type.getTypeId() == 0xF) {
-				int mapCount = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 4, 6));
-				if (HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 6, 8)) != 0x0
-						|| mapCount > 0x1000  
-						|| (mapCount == 0x0 && elementHex.length > 0x10) ) {
-					return null; // Object of struct 0xF? Something else?
-				}
-			}	
-			if (type.isEnumMap() && SBJson.get().getEnums().isEmpty()) {
-				return null; 
-			}
-			if (type.isStructArray()) {
-				boolean structsExists = SBJson.get().getStructs() != null;
-				type.setStringTable(structsExists && SBJson.get().getStructs().get(0).getName().contentEquals("StringPair"));
-				if (!structsExists || !DataUtils.checkForOverrideField(SBinFieldType.SUB_STRUCT)) {
-					return null; // SubStruct enum is chosen just because of the same Id
-				}
+		if (!type.isStructArray() && !Arrays.equals(Arrays.copyOfRange(elementHex, 2, 4), SHORTBYTE_EMPTY)) {
+			return null; // Struct Array header is 2 bytes, with other 2 bytes indicating Struct Id
+		}
+		if (type.getTypeId() == 0xF && !isMapPropertiesValid(elementHex)) {
+			return null; 
+		}	
+		if (type.isEnumMap() && SBJson.get().getEnums().isEmpty()) {
+			return null; 
+		}
+		if (type.isStructArray()) {
+			boolean structsExists = SBJson.get().getStructs() != null;
+			if (!structsExists || !checkForArrayRuleField(elementHex)) {
+				return null; // SubStruct enum is chosen just because of the same Id
 			}
 		}
 		return type;
@@ -62,6 +59,27 @@ public class SBinMapUtils {
 		return null;
 	}
 	
+	public static boolean checkForArrayRuleField(byte[] elementHex) {
+		if (!isMapPropertiesValid(elementHex)) {return false;}
+		int structBaseId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4));
+		for (SBinField field : SBJson.get().getEmptyFields()) {
+			if (field.getName().contentEquals(STRUCT_ARRAY_RULE) && field.getSpecOrderId() == structBaseId) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private static boolean isMapPropertiesValid(byte[] elementHex) {
+		int arrayCount = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 4, 6));
+		if (HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 6, 8)) != 0x0
+				|| arrayCount > 0x1000  
+				|| (arrayCount == 0x0 && elementHex.length > 0xA) ) {
+			return false; // Object of Struct? Something else?
+		}
+		return true;
+	}
+	
 	//
 	
 	public static class SBinMapType {
@@ -71,7 +89,6 @@ public class SBinMapUtils {
 		private boolean isEnumMap;
 		private boolean isStructArray;
 		private boolean cdatEntries;
-		private boolean isStringTable = false;
 		
 		public SBinMapType(int typeId, String typeName, int entrySize,
 				boolean isEnumMap, boolean isStructArray, boolean cdatEntries) {
@@ -124,14 +141,6 @@ public class SBinMapUtils {
 		public void setCDATEntries(boolean cdatEntries) {
 			this.cdatEntries = cdatEntries;
 		}
-		
-		//
-		
-		public boolean isStringTable() {
-			return isStringTable;
-		}
-		public void setStringTable(boolean isStringTable) {
-			this.isStringTable = isStringTable;
-		}
+
 	}
 }

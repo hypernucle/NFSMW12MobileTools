@@ -71,12 +71,4 @@ public class DataUtils {
 		return null;
 	}
 	
-	public static boolean checkForOverrideField(SBinFieldType type) {
-		for (SBinField field : SBJson.get().getEmptyFields()) {
-			if (field.getFieldTypeEnum().equals(type)) {
-				return true;
-			}
-		}
-		return false;
-	}
 }

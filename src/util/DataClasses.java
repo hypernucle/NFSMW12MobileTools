@@ -397,21 +397,23 @@ public final class DataClasses {
 		@SerializedName("OrderHexId")
 		private String orderHexId; // Only for info
 		@SerializedName("OHDRPadRemainder")
-		private int ohdrPadRemainder = 0;
+		private String ohdrPadRemainder = "0";
 		@SerializedName("HexValue")
 		private String hexValue;
 		@SerializedName("ExtraHexValue")
 		private String extraHexValue;
 		@SerializedName("StructName")
 		private String structName;
+		@SerializedName("StructBaseName")
+		private String structBaseName;
 		@SerializedName("GlobalType")
 		private SBinDataGlobalType globalType = SBinDataGlobalType.UNKNOWN;
 		@SerializedName("MapElements")
 		private List<String> mapElements;
-		@SerializedName("StringData")
-		private List<SBinStringPair> stringData;
 		@SerializedName("Fields")
 		private List<SBinDataField> fields;
+		@SerializedName("ArrayObjects")
+		private List<SBinDataElement> arrayObjects; // StructArray
 		
 		public String getOrderHexId() {
 			return orderHexId;
@@ -420,11 +422,14 @@ public final class DataClasses {
 			this.orderHexId = orderHexId;
 		}
 		
-		public int getOhdrPadRemainder() {
-			return ohdrPadRemainder;
+		public int getOHDRPadRemainder() {
+			return Integer.parseInt(ohdrPadRemainder);
 		}
-		public void setOhdrPadRemainder(int ohdrPadRemainder) {
-			this.ohdrPadRemainder = ohdrPadRemainder;
+		public void setOHDRPadRemainder(int ohdrPadRemainder) {
+			this.ohdrPadRemainder = String.valueOf(ohdrPadRemainder);
+		}
+		public void hideOHDRPadRemainder() {
+			this.ohdrPadRemainder = null;
 		}
 		
 		public String getHexValue() {
@@ -448,18 +453,18 @@ public final class DataClasses {
 			this.structName = structName;
 		}
 		
+		public String getStructBaseName() {
+			return structBaseName;
+		}
+		public void setStructBaseName(String structBaseName) {
+			this.structBaseName = structBaseName;
+		}
+		
 		public SBinDataGlobalType getGlobalType() {
 			return globalType;
 		}
 		public void setGlobalType(SBinDataGlobalType globalType) {
 			this.globalType = globalType;
-		}
-		
-		public List<SBinStringPair> getStringData() {
-			return stringData;
-		}
-		public void setStringData(List<SBinStringPair> stringData) {
-			this.stringData = stringData;
 		}
 		
 		public List<String> getMapElements() {
@@ -474,6 +479,13 @@ public final class DataClasses {
 		}
 		public void setFields(List<SBinDataField> fields) {
 			this.fields = fields;
+		}
+		
+		public List<SBinDataElement> getArrayObjects() {
+			return arrayObjects;
+		}
+		public void setArrayObjects(List<SBinDataElement> arrayObjects) {
+			this.arrayObjects = arrayObjects;
 		}
 	}
 	
@@ -558,36 +570,6 @@ public final class DataClasses {
 		}
 		public void setSubFields(List<SBinDataField> subFields) {
 			this.subFields = subFields;
-		}
-	}
-	
-	public static class SBinStringPair {
-		@SerializedName("StringId")
-		private String stringId; 
-		@SerializedName("String")
-		private String string; 
-		@SerializedName("HalVersionValue")
-		private int halVersionValue; 
-		
-		public String getStringId() {
-			return stringId;
-		}
-		public void setStringId(String stringId) {
-			this.stringId = stringId;
-		}
-		
-		public String getString() {
-			return string;
-		}
-		public void setString(String string) {
-			this.string = string;
-		}
-		
-		public int getHalVersionValue() {
-			return halVersionValue;
-		}
-		public void setHalVersionValue(int halVersionValue) {
-			this.halVersionValue = halVersionValue;
 		}
 	}
 	

@@ -16,13 +16,13 @@ public class LaunchParameters {
 		case DISABLE_DATA_OBJECTS_UNPACK_STR:
 			System.out.println("### Launch Parameter: DATA objects unpacking disabled. \nAll DATA objects will be properly "
 					+ "splitted according by OHDR table, but without any Object parsing. 1-to-1 repacking still should be possible.");
-			disableDATAObjectsUnpack = true;
+			disableDATAObjectsUnpack();
 			break;
 		case DISABLE_MIPMAP_UNPACK_STR:
 			System.out.println("### Launch Parameter: Mipmaps unpacking disabled. \nNote that the DATA objects "
 					+ "could still contain Mipmaps information, so you must generate all Mipmaps manually, "
 					+ "or edit .sba Json accordingly.");
-			disableMipmapUnpack = true;
+			disableMipmapUnpack();
 			break;
 		default: 
 			System.out.println("### Wrong Launch Parameter: " + args[3] + ", ignored.");
@@ -30,10 +30,16 @@ public class LaunchParameters {
 		}
 	}
 	
+	public static void disableDATAObjectsUnpack() {
+		disableDATAObjectsUnpack = true;
+	}
 	public static boolean isDATAObjectsUnpackDisabled() {
 		return disableDATAObjectsUnpack;
 	}
 	
+	public static void disableMipmapUnpack() {
+		disableMipmapUnpack = true;
+	}
 	public static boolean isMipmapUnpackDisabled() {
 		return disableMipmapUnpack;
 	}

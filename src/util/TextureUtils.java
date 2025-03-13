@@ -4,12 +4,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
 
 import jogl.DDSImage;
 import jogl.DDSImage.ImageInfo;
 import util.DataClasses.SBinDataElement;
+import util.HEXClasses.ETC1PKMTexture;
 import util.HEXClasses.SBinBlockObj;
 
 public class TextureUtils {
@@ -23,6 +27,7 @@ public class TextureUtils {
 	private static final String PARAM_MIPMAPS = "mipmaps";
 	
 	private static int imageFormatId = DDSImage.D3DFMT_A8R8G8B8;
+	private static SBinTextureFormat curTexFormat;
 	
 	public static void extractImage(SBinBlockObj bulkBlock, byte[] bargBlock) throws IOException {
 		List<SBinDataElement> textures = DataUtils.getAllDataElementsByStructName(PARAM_TEXTURE);
@@ -31,10 +36,15 @@ public class TextureUtils {
 			int width = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_WIDTH).getValue());
 			int height = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_HEIGHT).getValue());
 			
+			if (!checkSBAImageFormat(texParams)) { // All Mipmap objects repeats the image format
+				System.out.println("!!! This Image format is not supported for unpack or repack (" + curTexFormat.toString() + "). "
+						+ "File contents will be unpacked without the Image.");
+				return;
+			}
+			
 			// MipMap map comes after the Texture object
-			List<String> mipmapsList = getDATAMipmapsList(texParams);
+			List<String> mipmapsList = processDATAMipmapsList(texParams);
 			ByteBuffer[] mipMaps = new ByteBuffer[mipmapsList.size()];
-			boolean imageFormatChecked = false;
 			
 			int curMipmap = 0;
 			for (String dataMMId : mipmapsList) {
@@ -45,17 +55,7 @@ public class TextureUtils {
 				}
 				int mmLevelWidth = Integer.parseInt(DataUtils.getDataFieldByName(mmLevel, PARAM_WIDTH).getValue());
 				int mmLevelHeight = Integer.parseInt(DataUtils.getDataFieldByName(mmLevel, PARAM_HEIGHT).getValue());
-				
 				int bulkElementId = Integer.parseInt(DataUtils.getDataFieldByName(mmLevel, PARAM_DATA).getValue());
-				if (!imageFormatChecked) { // All Mipmap objects repeats the image format
-					String imageFormat = DataUtils.getDataFieldByName(mmLevel, "format").getValue();
-					imageFormatChecked = checkSBAImageFormat(imageFormat);
-					if (!imageFormatChecked) {
-						System.out.println("!!! This Image format is not supported for unpack or repack (" + imageFormat + "). "
-								+ "File contents will be unpacked without the Image.");
-						return;
-					}
-				}
 				
 				int mmLevelStartOffset = HEXUtils.byteArrayToInt(
 						Arrays.copyOfRange(bulkBlock.getBlockElements().get(bulkElementId), 0, 4));
@@ -67,10 +67,34 @@ public class TextureUtils {
 						processMipmapImageOperations(mmData, mmLevelWidth, mmLevelHeight, true));
 				curMipmap++;
 			}
-			DDSImage image = DDSImage.createFromData(imageFormatId, width, height, mipMaps);
-			String nameAddition = textures.size() > 1 ? "_" + i : "";
-			image.write(new File(SBJson.get().getFileName() + nameAddition + ".dds"));
+			writeImage(textures.size(), i, width, height, mipMaps);
 			i++;
+		}
+	}
+	
+	private static void writeImage(int texturesCount, int i, int width, int height, ByteBuffer[] mipMaps) throws IOException {
+		String fileName = SBJson.get().getFileName() + (texturesCount > 1 ? "_" + i : "");
+		// Assuming we have "etc1tool" from Android SDK
+		if (curTexFormat.equals(SBinTextureFormat.ETC_RGB)) {
+			ETC1PKMTexture etc1 = new ETC1PKMTexture();
+			etc1.setEncWidth(HEXUtils.shortToBytesBE(width));
+			etc1.setWidth(HEXUtils.shortToBytesBE(width));
+			etc1.setEncHeight(HEXUtils.shortToBytesBE(height));
+			etc1.setHeight(HEXUtils.shortToBytesBE(height));
+			
+			byte[] mipmapBytes = new byte[mipMaps[0].remaining()];
+			mipMaps[0].get(mipmapBytes);
+			etc1.setImageData(mipmapBytes);
+			
+			Files.write(Paths.get("tools/etc1tex.bin"), etc1.toByteArray(), 
+					StandardOpenOption.WRITE, StandardOpenOption.CREATE, 
+					StandardOpenOption.TRUNCATE_EXISTING);
+			ProcessBuilder p = new ProcessBuilder(
+					"tools/etc1tool.exe", "tools/etc1tex.bin", "--decode", "-o", fileName + ".png");
+			p.start();
+		} else {
+			DDSImage image = DDSImage.createFromData(imageFormatId, width, height, mipMaps);
+			image.write(new File(fileName + ".dds"));
 		}
 	}
 	
@@ -127,14 +151,20 @@ public class TextureUtils {
 	
 	//
 	
-	private static List<String> getDATAMipmapsList(SBinDataElement texParams) {
+	private static List<String> processDATAMipmapsList(SBinDataElement texParams) {
 		SBinDataElement mmmap = DataUtils.getDataElementFromValueId(texParams, PARAM_MIPMAPS);
-		return LaunchParameters.isMipmapUnpackDisabled() ? mmmap.getMapElements().subList(0, 1) : mmmap.getMapElements();
+		
+		return LaunchParameters.isMipmapUnpackDisabled() 
+				|| curTexFormat.equals(SBinTextureFormat.ETC_RGB)
+				? mmmap.getMapElements().subList(0, 1) : mmmap.getMapElements();
 	}
 	
 	private static byte[] processMipmapImageOperations(
 			byte[] mmData, int mmLevelWidth, int mmLevelHeight, boolean unpack) throws IOException {
-		if (unpack) {
+		if (curTexFormat.equals(SBinTextureFormat.ETC_RGB)) {
+			return mmData; // Do nothing
+		}
+		else if (unpack) {
 			return flipPixelsVertically(interleaveHexImage(mmData), mmLevelWidth, mmLevelHeight);
 		} else {
 			return interleaveHexImage(flipPixelsVertically(mmData, mmLevelWidth, mmLevelHeight));
@@ -143,7 +173,6 @@ public class TextureUtils {
 	
 	private static byte[] interleaveHexImage(byte[] imageHex) throws IOException {
 		ByteArrayOutputStream imageStream = new ByteArrayOutputStream();
-		
 		if (imageFormatId == DDSImage.D3DFMT_A8R8G8B8) {
 			for (byte[] pixel : HEXUtils.splitByteArray(imageHex, 0x4)) {
 				imageStream.write(new byte[]{
@@ -175,16 +204,29 @@ public class TextureUtils {
         return data;
     }
 	
-	private static boolean checkSBAImageFormat(String imageFormat) {
-		boolean isCompatibleFormat = false;
-		if (imageFormat.contentEquals("RGBA")) {
-			imageFormatId = DDSImage.D3DFMT_A8R8G8B8;
-			isCompatibleFormat = true;
-		} else if (imageFormat.contentEquals("RGB")) {
+	private static boolean checkSBAImageFormat(SBinDataElement texParams) {
+		SBinDataElement mmmap = DataUtils.getDataElementFromValueId(texParams, PARAM_MIPMAPS);
+		int dataId = HEXUtils.strHexToInt(mmmap.getMapElements().get(0));
+		SBinDataElement mmLevel = SBJson.get().getDataElements().get(dataId);
+		String imageFormat = DataUtils.getDataFieldByName(mmLevel, "format").getValue();
+		
+		curTexFormat = SBinTextureFormat.valueOf(imageFormat);
+		boolean isSupported = false;
+		switch(SBinTextureFormat.valueOf(imageFormat)) {
+		case RGB:
 			imageFormatId = DDSImage.D3DFMT_R8G8B8;
-			isCompatibleFormat = true;
+			isSupported = true;
+			break;
+		case RGBA:
+			imageFormatId = DDSImage.D3DFMT_A8R8G8B8;
+			isSupported = true;
+			break;
+		case ETC_RGB:
+			isSupported = true;
+			break;
+		default: break;
 		}
-		return isCompatibleFormat;
+		return isSupported;
 	}
 	
 	private static void setCurrentImageFormat(int imageFormat) {

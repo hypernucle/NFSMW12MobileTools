@@ -53,6 +53,9 @@ public final class HEXUtils {
 	public static byte[] shortToBytes(int data) {
 		return ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN).putShort((short)data).array();
 	}
+	public static byte[] shortToBytesBE(int data) {
+		return ByteBuffer.allocate(2).order(ByteOrder.BIG_ENDIAN).putShort((short)data).array();
+	}
 	
 	public static float bytesToFloat(byte[] bytes) {
 		return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getFloat();
