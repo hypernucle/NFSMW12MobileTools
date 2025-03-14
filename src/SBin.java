@@ -44,7 +44,7 @@ public class SBin {
 		SBinMapUtils.initMapTypes();
 	}
 
-	public void unpackSBin(String fileType, String filePath) throws IOException {
+	public void unpackSBin(String fileType, String filePath) throws IOException, InterruptedException {
 		SBJson.initNewSBJson();
 		Path sbinFilePath = Paths.get(filePath);
 		byte[] sbinData = Files.readAllBytes(sbinFilePath);
@@ -107,6 +107,9 @@ public class SBin {
 
 	public void repackSBin(String filePath) throws IOException {
 		SBJson.loadSBJson(filePath);
+		if (SBJson.get().getSBinType() == SBinType.TEXTURE) {
+			TextureUtils.checkForImageFormatOperations();
+		}
 
 		// ENUM
 		SBinBlockObj enumBlock = createSBinBlock(SBinBlockType.ENUM);
