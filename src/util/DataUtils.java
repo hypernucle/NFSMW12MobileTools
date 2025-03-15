@@ -1,6 +1,7 @@
 package util;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import util.DataClasses.SBinCDATEntry;
@@ -24,6 +25,16 @@ public class DataUtils {
 		newEntry.setChdrHexId(HEXUtils.hexToString(newCHDRId));
 		SBJson.get().getCDATStrings().add(newEntry);
 		return newCHDRId;
+	}
+	
+	public static String getCDATStringByShortCHDRId(byte[] bytes, int startIndex, int endIndex) {
+		int hexCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(bytes, startIndex, endIndex));
+		return SBJson.get().getCDATStrings().get(hexCHDRId).getString();
+	}
+	
+	public static SBinCDATEntry getCDATEntryByEnumCHDRId(byte[] bytes) {
+		int hexCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(bytes, 0, 2));
+		return SBJson.get().getCDATStrings().get(hexCHDRId);
 	}
 	
 	public static SBinDataElement getDataElementByStructName(String structName) {

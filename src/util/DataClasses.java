@@ -5,6 +5,8 @@ import java.util.List;
 
 import com.google.gson.annotations.SerializedName;
 
+import util.SBinHCStructs.SBinHCStruct;
+
 public final class DataClasses {
 	private DataClasses() {}
 	
@@ -46,12 +48,12 @@ public final class DataClasses {
 		private List<SBinField> emptyFields = new ArrayList<>();
 		@SerializedName("Structs")
 		private List<SBinStruct> structs = new ArrayList<>();
+		@SerializedName("PlaylistsData")
+		private List<SBinPlaylistObj> playlistsArray;
 		@SerializedName("DATA_Elements")
 		private List<SBinDataElement> dataElements;
 		@SerializedName("CDAT_Strings")
 		private List<SBinCDATEntry> cdatStrings;
-		@SerializedName("PlaylistsData")
-		private List<SBinPlaylistObj> playlistsArray;
 		
 		public String getFileName() {
 			return fileName;
@@ -186,6 +188,13 @@ public final class DataClasses {
 			this.structs = structs;
 		}
 		
+		public List<SBinPlaylistObj> getPlaylistsArray() {
+			return playlistsArray;
+		}
+		public void setPlaylistsArray(List<SBinPlaylistObj> playlistsArray) {
+			this.playlistsArray = playlistsArray;
+		}
+		
 		public List<SBinField> getEmptyFields() {
 			return emptyFields;
 		}
@@ -205,13 +214,6 @@ public final class DataClasses {
 		}
 		public void setDataElements(List<SBinDataElement> dataElements) {
 			this.dataElements = dataElements;
-		}
-		
-		public List<SBinPlaylistObj> getPlaylistsArray() {
-			return playlistsArray;
-		}
-		public void setPlaylistsArray(List<SBinPlaylistObj> playlistsArray) {
-			this.playlistsArray = playlistsArray;
 		}
 	}
 	
@@ -414,6 +416,8 @@ public final class DataClasses {
 		private List<SBinDataField> fields;
 		@SerializedName("ArrayObjects")
 		private List<SBinDataElement> arrayObjects; // StructArray
+		@SerializedName("HCStruct")
+		private SBinHCStruct hcStruct; // Hard-coded Struct
 		
 		public String getOrderHexId() {
 			return orderHexId;
@@ -486,6 +490,13 @@ public final class DataClasses {
 		}
 		public void setArrayObjects(List<SBinDataElement> arrayObjects) {
 			this.arrayObjects = arrayObjects;
+		}
+		
+		public SBinHCStruct getHCStruct() {
+			return hcStruct;
+		}
+		public void setHCStruct(SBinHCStruct hcStruct) {
+			this.hcStruct = hcStruct;
 		}
 	}
 	
@@ -653,4 +664,5 @@ public final class DataClasses {
 			this.title = title;
 		}
 	}
+	
 }

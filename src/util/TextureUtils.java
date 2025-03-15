@@ -30,6 +30,7 @@ public class TextureUtils {
 	private static final String PARAM_FORMAT = "format";
 	private static final String PARAM_TEXTURE = "Texture";
 	private static final String PARAM_MIPMAPS = "mipmaps";
+	private static final String ETC1_TEMP_PATH = "tools/etc1tex.bin";
 	
 	private static final String FILE_DDS = ".dds";
 	private static final String FILE_PNG = ".png";
@@ -98,16 +99,16 @@ public class TextureUtils {
 			mipMaps[0].get(mipmapBytes);
 			etc1.setImageData(mipmapBytes);
 			
-			Files.write(Paths.get("tools/etc1tex.bin"), etc1.toByteArray(), StandardOpenOption.WRITE, 
+			Files.write(Paths.get(ETC1_TEMP_PATH), etc1.toByteArray(), StandardOpenOption.WRITE, 
 					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 			Process etc1Tool = new ProcessBuilder(
-					"tools/etc1tool.exe", "tools/etc1tex.bin", "--decode", "-o", fileName + FILE_PNG).start();
+					"tools/etc1tool.exe", ETC1_TEMP_PATH, "--decode", "-o", fileName + FILE_PNG).start();
 			etc1Tool.waitFor();
 			
+			Files.deleteIfExists(Paths.get(ETC1_TEMP_PATH)); // Temporary file
 			fileName = fileName + FILE_PNG;
 			File pngFile = new File(fileName);
-			BufferedImage pngImg = ImageIO.read(pngFile); 
-			ImageIO.write(flipPNGPixelsVertically(pngImg), "png", pngFile); 
+			ImageIO.write(flipPNGPixelsVertically(ImageIO.read(pngFile)), "png", pngFile); 
 			System.out.println("### ETC1 texture is converted to .png. In order to repack it back for .sba, "
 					+ "please provide .dds with the same name in " + FMT_R8G8B8 + " format.");
 		} else {

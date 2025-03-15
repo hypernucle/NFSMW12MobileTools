@@ -1,5 +1,5 @@
 package util;
 
 public enum SBinType {
-	COMMON, TEXTURE, PLAYLISTS
+	COMMON, TEXTURE, PLAYLISTS, CAR_CONFIG, LAYOUTS
 }

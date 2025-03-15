@@ -19,6 +19,8 @@ import util.SBinBlockType;
 import util.SBinDataGlobalType;
 import util.SBinEnumUtils;
 import util.SBinFieldType;
+import util.SBinHCStructs;
+import util.SBinHCStructs.SBinHCStruct;
 import util.SBinMapUtils;
 import util.SBinMapUtils.SBinMapType;
 import util.TextureUtils;
@@ -42,10 +44,11 @@ public class SBin {
 	
 	public static void startup() {
 		SBinMapUtils.initMapTypes();
+		SBinHCStructs.initHCStructs();
+		SBJson.initNewSBJson();
 	}
 
 	public void unpackSBin(String fileType, String filePath) throws IOException, InterruptedException {
-		SBJson.initNewSBJson();
 		Path sbinFilePath = Paths.get(filePath);
 		byte[] sbinData = Files.readAllBytes(sbinFilePath);
 
@@ -54,7 +57,9 @@ public class SBin {
 			System.out.println("!!! This SBin version is not supported, version 3 required.");
 			return;
 		}
-		SBJson.get().setSBinType(SBinType.valueOf(fileType.toUpperCase()));
+		if (SBJson.get().getSBinType() == null) {
+			SBJson.get().setSBinType(SBinType.valueOf(fileType.toUpperCase()));
+		}
 		SBJson.get().setFileName(sbinFilePath.getFileName().toString());
 		SBJson.get().setSBinVersion(sbinVersion);
 		
@@ -301,15 +306,7 @@ public class SBin {
 		return entries;
 	}
 	
-	private String getCDATStringByShortCHDRId(byte[] bytes, int startIndex, int endIndex) {
-		int hexCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(bytes, startIndex, endIndex));
-		return SBJson.get().getCDATStrings().get(hexCHDRId).getString();
-	}
 	
-	private SBinCDATEntry getCDATEntryByEnumCHDRId(byte[] bytes) {
-		int hexCHDRId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(bytes, 0, 2));
-		return SBJson.get().getCDATStrings().get(hexCHDRId);
-	}
 	
 	//
 	// SBin object-related functions
@@ -396,9 +393,9 @@ public class SBin {
 				processDataFieldValue(subField, field, subStructOffset, subDataField, elementHex, element);
 			}
 			subFields.add(subDataField);
-			if (element.getOrderHexId().contentEquals("0900")) {
-				System.out.println(struct.getFieldsArray().size() + ", " + subDataField.getType() + ", " + subDataField.getValue());
-			}
+//			if (element.getOrderHexId().contentEquals("0900")) {
+//				System.out.println(struct.getFieldsArray().size() + ", " + subDataField.getType() + ", " + subDataField.getValue());
+//			}
 		}
 		dataField.setSubFields(subFields);
 	}
@@ -459,7 +456,7 @@ public class SBin {
 			SBinEnum enumObj = new SBinEnum();
 			enumObj.setId(i);
 			enumObj.setName( // int here but anyway
-					getCDATStringByShortCHDRId(enumBytes, 0, 2));
+					DataUtils.getCDATStringByShortCHDRId(enumBytes, 0, 2));
 			byte[] dataIdMapRef = Arrays.copyOfRange(enumBytes, 4, 6);
 			enumObj.setDataIdMapRef(HEXUtils.hexToString(dataIdMapRef));
 			SBJson.get().addEnum(enumObj);
@@ -527,7 +524,7 @@ public class SBin {
 		for (byte[] structBytes : struBlock.getBlockElements()) {
 			SBinStruct struct = new SBinStruct();
 			struct.setId(id);
-			struct.setName(getCDATStringByShortCHDRId(structBytes, 0, 2));
+			struct.setName(DataUtils.getCDATStringByShortCHDRId(structBytes, 0, 2));
 			
 			int firstFieldId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 2, 4));
 			int countToNextStruct = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 4, 6));
@@ -620,7 +617,7 @@ public class SBin {
 		for (byte[] ohdrPos : ohdrBlock.getBlockElements()) {
 			SBinDataElement element = new SBinDataElement();
 			int elementOHDR = HEXUtils.byteArrayToInt(ohdrPos);
-			int elementEnd = elementOHDR / 0x8;
+			int elementEnd = elementOHDR / 0x8; // Or (next elementOHDR - elementOHDR >> 3)
 			
 			element.setOrderHexId(HEXUtils.setDataEntryHexId(i, SBJson.get().isDataLongElementIds()));
 			byte[] elementHex = Arrays.copyOfRange(dataBlock.getBlockBytes(), ohdrPrevValue, elementEnd);
@@ -631,7 +628,7 @@ public class SBin {
 			if (element.getGlobalType().equals(SBinDataGlobalType.UNKNOWN)) {
 				fillElementHexValue(element, elementHex);
 				isAllObjectsKnown = false;
-			} else {
+			} else if (!element.getGlobalType().equals(SBinDataGlobalType.HC_STRUCT)) {
 				parseDATAFields(getCleanElementHex(ohdrPrevValue, elementEnd, element, 
 						remainder, elementHex, dataBlock), i, element);
 			}
@@ -650,6 +647,7 @@ public class SBin {
 		boolean beginOnBlockStart = ohdrPrevValue % 4 == 0;
 		int partialLastBlockTakenBytes = elementEnd % 4;
 		int paddingSize = 0x0;
+		boolean hack = false;
 		
 		boolean partialLastBlockQuestion = false;
 		if (element.getGlobalType().equals(SBinDataGlobalType.STRUCT)) {
@@ -669,38 +667,33 @@ public class SBin {
 			else if (mapElementsCount == 0) { // Empty StructArray always have the same size
 				paddingSize = elementHex.length - SBinMapUtils.HEADERFULL_SIZE;
 			} 
-			else { // TODO Works bad with struct arrays!
-				//List<SBinField> fields = DataUtils.getStructByName(element.getStructBaseName()).getFieldsArray();
-				//int lastFieldStartOffset = fields.get(fields.size() - 1).getStartOffset(); 
-				//int knownTakenBytes = lastFieldStartOffset * mapElementsCount + SBinMapUtils.HEADERFULL_SIZE;
-				//paddingSize = elementHex.length - lastFieldStartOffset / 2 * 3;
-				
-				
-				//partialLastBlockQuestion = partialLastBlockTakenBytes != 0 
-				//		&& lastFieldStartOffset == (elementHex.length - partialLastBlockTakenBytes);
-			}
+			else {
+				hack = true;
+			} // TODO Fails to work well with StructArrays, due to missing sizes of each last element
 		}
 		
 		boolean lastBlockPartialData = partialLastBlockTakenBytes != 0 && !partialLastBlockQuestion;
-		if (remainder == 0x0 && paddingSize == 0x0 && lastBlockPartialData) {
+		if (!hack && remainder == 0x0 && paddingSize == 0x0 && lastBlockPartialData) {
 			paddingSize = beginOnBlockStart 
 					? partialLastBlockTakenBytes
 					: 0x4 - partialLastBlockTakenBytes;
 		}
-		System.out.println("pad for " + element.getOrderHexId() + ": " + paddingSize + ", partialLastBlockTakenBytes: " + partialLastBlockTakenBytes + ", remainder: " + remainder);
+		//System.out.println("pad for " + element.getOrderHexId() + ": " + paddingSize + ", partialLastBlockTakenBytes: " + partialLastBlockTakenBytes + ", remainder: " + remainder);
 		
 		element.setExtraHexValue(HEXUtils.hexToString(new byte[paddingSize]));
 		return Arrays.copyOfRange(dataBlock.getBlockBytes(), ohdrPrevValue, elementEnd - paddingSize);
 	}
 	
 	private void detectElementStruct(byte[] elementHex, int i, SBinDataElement element) {
-		if (LaunchParameters.isDATAObjectsUnpackDisabled() 
-				|| hardcodedExceptionsForSomeDATAElements(elementHex, i)) {
-			element.setGlobalType(SBinDataGlobalType.UNKNOWN);
+		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {
+			return;
+		}
+		int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
+		if (hardcodedExceptionsForSomeDATAElements(elementHex, i, structId) ||
+				processHCStructs(elementHex, i, element, structId)) {
 			return;
 		}
 		
-		int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
 		SBinMapType mapType = SBinMapUtils.getMapType(elementHex);
 		if (mapType != null) {
 			element.setStructName(mapType.getTypeName());
@@ -723,6 +716,21 @@ public class SBin {
 		//System.out.println("structId: " + structId + ", :" + (sbinJson.getStructs().size() > structId));
 	}
 	
+	private boolean processHCStructs(byte[] elementHex, int i, SBinDataElement element, int structId) {
+		if (SBJson.get().getSBinType().equals(SBinType.COMMON) || SBJson.get().getSBinType().equals(SBinType.TEXTURE)) {
+			return false;
+		}
+		SBinHCStruct hcStruct = SBinHCStructs.getHCStruct(structId);
+		if (hcStruct == null) {return false;}
+		hcStruct.setHCStructId(structId);
+		
+		element.setHCStruct(hcStruct);
+		element.setStructName(hcStruct.getName());
+		element.setGlobalType(SBinDataGlobalType.HC_STRUCT);
+		SBinHCStructs.unpackHCStructs(elementHex, element, structId);
+		return true;
+	}
+	
 	private void processDataMap(byte[] elementHex, SBinDataElement element, SBinMapType mapType) throws IOException {
 		if (!mapType.isStructArray()) {
 			List<String> mapElements = new ArrayList<>();
@@ -731,7 +739,7 @@ public class SBin {
 			
 			for (byte[] mapValue : readDATABlockObjectMap(elementHex, mapType.getEntrySize())) {
 				if (mapType.isCDATEntries()) { // Enums
-					stringObj = getCDATEntryByEnumCHDRId(mapValue);
+					stringObj = DataUtils.getCDATEntryByEnumCHDRId(mapValue);
 					mapElements.add(stringObj.getString());
 				} else {
 					mapElements.add(HEXUtils.hexToString(Arrays.copyOf(mapValue, entrySize)));
@@ -757,6 +765,12 @@ public class SBin {
 			int arraySize = HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, 4, 8));
 			int structSize = arraySize != 0 ? (elementHex.length - SBinMapUtils.HEADERFULL_SIZE) / arraySize : 0;
 			
+			// Hack to deal with StringPairs, padding issue on other cases
+			if (!SBJson.get().getStructs().get(0).getName().contentEquals("StringPair")) {
+				fillElementHexValue(element, elementHex);
+				element.setGlobalType(SBinDataGlobalType.UNKNOWN);
+				return;
+			}
 			List<SBinDataElement> arrayObjects = new ArrayList<>();
 			for (int i = 0; i < arraySize; i++) {
 				int structHexStart = SBinMapUtils.HEADERFULL_SIZE + (structSize * i);
@@ -791,7 +805,7 @@ public class SBin {
 		SBinDataField cdatString = new SBinDataField();
 		cdatString.setName("CDATString");
 		cdatString.setType("CHDR_ID_REF");
-		cdatString.setValue(getCDATStringByShortCHDRId(elementHex, 4, 6));
+		cdatString.setValue(DataUtils.getCDATStringByShortCHDRId(elementHex, 4, 6));
 		fields.add(cdatString);
 		
 		SBinDataField hex2 = new SBinDataField();
@@ -803,15 +817,16 @@ public class SBin {
 		element.setFields(fields);
 	}
 	
-	private boolean hardcodedExceptionsForSomeDATAElements(byte[] elementHex, int i) {
-		boolean isLayoutsFile = SBJson.get().getFileName().contentEquals("layouts.sb");
-		//
-		int header = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
-		if (isLayoutsFile) {
-			if (header == 0x5 || // Doesn't fit Struct #5, looks like 0xF map instead
-				i != 0 && header == 0x1) { // Doesn't fit Struct #1, it was re-used for StructArray primarily
+	private boolean hardcodedExceptionsForSomeDATAElements(byte[] elementHex, int i, int structId) {
+		if (SBJson.get().getSBinType().equals(SBinType.LAYOUTS)) {
+			if (structId == 0x5 || // Doesn't fit Struct #5, looks like 0xF map instead
+					i != 0 && structId == 0x1) { // Doesn't fit Struct #1, it was re-used for StructArray primarily
 				return true; 
 			}
+		} else if (SBJson.get().getSBinType().equals(SBinType.CAR_CONFIG)) {
+			if (structId == 0x1 && elementHex.length > 0xC) { // Doesn't fit Struct #1
+				return true; 
+			} 
 		}
 		return false;
 	}
@@ -858,7 +873,7 @@ public class SBin {
 			SBinPlaylistObj playlist = new SBinPlaylistObj();
 			playlist.setOhdrDescRemainder(SBJson.get().getDataElements().get(dataIndex).getOHDRPadRemainder());
 			playlist.setName(
-					getCDATStringByShortCHDRId(playlistDescHex, 12, 14));
+					DataUtils.getCDATStringByShortCHDRId(playlistDescHex, 12, 14));
 			
 			List<byte[]> tracks = readDATABlockObjectMap(
 					dataBlock.getBlockElements().get(dataIndex + 1), 0x4);
@@ -870,11 +885,11 @@ public class SBin {
 				
 				trackObj.setOhdrUnkRemainder(SBJson.get().getDataElements().get(trackIndex).getOHDRPadRemainder());
 				trackObj.setFilePath(
-						getCDATStringByShortCHDRId(trackHex, 12, 14));
+						DataUtils.getCDATStringByShortCHDRId(trackHex, 12, 14));
 				trackObj.setArtist(
-						getCDATStringByShortCHDRId(trackHex, 22, 24));
+						DataUtils.getCDATStringByShortCHDRId(trackHex, 22, 24));
 				trackObj.setTitle(
-						getCDATStringByShortCHDRId(trackHex, 32, 34));
+						DataUtils.getCDATStringByShortCHDRId(trackHex, 32, 34));
 				playlist.addToPlaylist(trackObj);
 			}
 			playlistsJson.add(playlist);
@@ -926,11 +941,11 @@ public class SBin {
 						isFirstFieldPassed = true;
 					}
 					if (nextFieldName.contentEquals(field.getName())) {
-						System.out.println("same: " + field.getName());
+//						System.out.println("same: " + field.getName());
 						nextFieldName = "";
 						continue;
 					}
-					System.out.println("added: " + field.getName());
+//					System.out.println("added: " + field.getName());
 					fielHexStream.write(DataUtils.processStringInCDAT(field.getName()));
 					fielHexStream.write(HEXUtils.shortToBytes(
 							(short)SBinEnumUtils.getIdByStringName(field.getType())));
@@ -1024,7 +1039,7 @@ public class SBin {
 			ByteArrayOutputStream dataHexStream, SBinBlockObj block) throws IOException {
 		ByteArrayOutputStream dataElementStream = new ByteArrayOutputStream();
 		
-		System.out.println("test hexId: " + dataEntry.getOrderHexId());
+//		System.out.println("test hexId: " + dataEntry.getOrderHexId());
 		switch(dataEntry.getGlobalType()) {
 		case UNKNOWN:
 			// Unknown object or other stuff represented as HEX array
@@ -1124,9 +1139,9 @@ public class SBin {
 			if (subField.getSubStruct() != null) {
 				buildSubStructEntry(hexId, subField, dataElementStream);
 			} else {
-				if (hexId.contentEquals("0900")) {
-					System.out.println(subField.getType());
-				}
+//				if (hexId.contentEquals("0900")) {
+//					System.out.println(subField.getType());
+//				}
 				dataElementStream.write(fieldValueToBytes(subField, subStruct));
 			}
 		}
