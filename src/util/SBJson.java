@@ -13,6 +13,8 @@ import com.google.gson.reflect.TypeToken;
 import util.DataClasses.SBinField;
 import util.DataClasses.SBinJson;
 import util.DataClasses.SBinStruct;
+import util.SBinHCStructs.SBinHCStruct;
+import util.json.PolymorphDeserializer;
 
 public class SBJson {
 	
@@ -31,7 +33,10 @@ public class SBJson {
 	
 	public static void loadSBJson(String filePath) throws IOException {
 		Reader reader = Files.newBufferedReader(Paths.get(filePath), StandardCharsets.UTF_8);
-		SBinJson sbinJsonObj = new Gson().fromJson(reader, new TypeToken<SBinJson>(){}.getType());
+		gson = new GsonBuilder()
+				.registerTypeAdapter(SBinHCStruct.class, new PolymorphDeserializer<SBinHCStruct>())
+				.create();
+		SBinJson sbinJsonObj = gson.fromJson(reader, new TypeToken<SBinJson>(){}.getType());
 		reader.close();
 		sbinJsonEnt = sbinJsonObj;
 	}

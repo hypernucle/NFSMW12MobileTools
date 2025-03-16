@@ -689,8 +689,8 @@ public class SBin {
 			return;
 		}
 		int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
-		if (hardcodedExceptionsForSomeDATAElements(elementHex, i, structId) ||
-				processHCStructs(elementHex, i, element, structId)) {
+		if (cancelExceptionsForDATAElements(elementHex, i, structId) ||
+				processHCStructs(elementHex, element, structId)) {
 			return;
 		}
 		
@@ -716,8 +716,10 @@ public class SBin {
 		//System.out.println("structId: " + structId + ", :" + (sbinJson.getStructs().size() > structId));
 	}
 	
-	private boolean processHCStructs(byte[] elementHex, int i, SBinDataElement element, int structId) {
-		if (SBJson.get().getSBinType().equals(SBinType.COMMON) || SBJson.get().getSBinType().equals(SBinType.TEXTURE)) {
+	private boolean processHCStructs(byte[] elementHex, SBinDataElement element, int structId) {
+		if (SBJson.get().getSBinType().equals(SBinType.COMMON) ||
+				SBJson.get().getSBinType().equals(SBinType.TEXTURE) ||
+				SBinHCStructs.isExceptionForHCStructs(elementHex, structId)) {
 			return false;
 		}
 		SBinHCStruct hcStruct = SBinHCStructs.getHCStruct(structId);
@@ -725,7 +727,6 @@ public class SBin {
 		hcStruct.setHCStructId(structId);
 		
 		element.setHCStruct(hcStruct);
-		element.setStructName(hcStruct.getName());
 		element.setGlobalType(SBinDataGlobalType.HC_STRUCT);
 		SBinHCStructs.unpackHCStructs(elementHex, element, structId);
 		return true;
@@ -817,10 +818,10 @@ public class SBin {
 		element.setFields(fields);
 	}
 	
-	private boolean hardcodedExceptionsForSomeDATAElements(byte[] elementHex, int i, int structId) {
+	private boolean cancelExceptionsForDATAElements(byte[] elementHex, int i, int structId) {
 		if (SBJson.get().getSBinType().equals(SBinType.LAYOUTS)) {
 			if (structId == 0x5 || // Doesn't fit Struct #5, looks like 0xF map instead
-					i != 0 && structId == 0x1) { // Doesn't fit Struct #1, it was re-used for StructArray primarily
+					(i != 0 && structId == 0x1) ) { // Doesn't fit Struct #1, it was re-used for StructArray primarily
 				return true; 
 			}
 		} else if (SBJson.get().getSBinType().equals(SBinType.CAR_CONFIG)) {
@@ -1047,6 +1048,9 @@ public class SBin {
 			break;
 		case STRUCT: // Object from SBin
 			processDATAStruct(dataEntry, dataElementStream, true);
+			break;
+		case HC_STRUCT: // Hardcoded struct
+			dataElementStream.write(SBinHCStructs.repackHCStructs(dataEntry));
 			break;
 		case FIRST_DATA_ELEMENT:
 			for (SBinDataField dataField : dataEntry.getFields()) {

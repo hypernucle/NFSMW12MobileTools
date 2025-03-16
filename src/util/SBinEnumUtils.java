@@ -127,6 +127,10 @@ public class SBinEnumUtils {
 		return value;
 	}
 	
+	//
+	//
+	//
+	
 	private static String getDefaultHEXString(byte[] valueHex, SBinDataField dataField) {
 		dataField.setForcedHexValue(true);
 		return HEXUtils.hexToString(valueHex);
