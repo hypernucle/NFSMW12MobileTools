@@ -56,7 +56,8 @@ public class TextureUtils {
 			}
 			
 			// MipMap map comes after the Texture object
-			List<String> mipmapsList = processDATAMipmapsList(texParams);
+			SBinDataElement mmmap = DataUtils.getDataElementFromValueId(texParams, PARAM_MIPMAPS);
+			List<String> mipmapsList = processDATAMipmapsList(texParams, mmmap);
 			ByteBuffer[] mipMaps = new ByteBuffer[mipmapsList.size()];
 			
 			int curMipmap = 0;
@@ -80,12 +81,13 @@ public class TextureUtils {
 						processMipmapImageOperations(mmData, mmLevelWidth, mmLevelHeight, true));
 				curMipmap++;
 			}
-			writeImage(textures.size(), i, width, height, mipMaps);
+			writeImage(textures.size(), i, width, height, mipMaps, mmmap.getMapElements().size());
 			i++;
 		}
 	}
 	
-	private static void writeImage(int texturesCount, int i, int width, int height, ByteBuffer[] mipMaps) throws IOException, InterruptedException {
+	private static void writeImage(int texturesCount, int i, int width, int height, 
+			ByteBuffer[] mipMaps, int mipmapsOriginalCount) throws IOException, InterruptedException {
 		String fileName = SBJson.get().getFileName() + (texturesCount > 1 ? "_" + i : "");
 		// Assuming we have "etc1tool" from Android SDK
 		if (curTexFormat.equals(SBinTextureFormat.ETC_RGB)) {
@@ -116,8 +118,9 @@ public class TextureUtils {
 			fileName = fileName + FILE_DDS;
 			image.write(new File(fileName));
 		}
-		System.out.println(String.format("### Texture unpacked: %s, format: %s, original format: %s, width: %d, height: %d, mipmaps: %d", 
-				fileName, formatName, curTexFormat.toString(), width, height, mipMaps.length));
+		System.out.println(String.format("### Texture unpacked: %s, format: %s, original format: %s, "
+				+ "width: %d, height: %d, mipmaps: %d (original count: %d)", 
+				fileName, formatName, curTexFormat.toString(), width, height, mipMaps.length, mipmapsOriginalCount));
 	}
 	
 	public static void repackImage(SBinBlockObj block) throws IOException {
@@ -252,9 +255,7 @@ public class TextureUtils {
 	// Utils
 	//
 	
-	private static List<String> processDATAMipmapsList(SBinDataElement texParams) {
-		SBinDataElement mmmap = DataUtils.getDataElementFromValueId(texParams, PARAM_MIPMAPS);
-		
+	private static List<String> processDATAMipmapsList(SBinDataElement texParams, SBinDataElement mmmap) {
 		return LaunchParameters.isMipmapUnpackDisabled() 
 				|| curTexFormat.equals(SBinTextureFormat.ETC_RGB)
 				? mmmap.getMapElements().subList(0, 1) : mmmap.getMapElements();

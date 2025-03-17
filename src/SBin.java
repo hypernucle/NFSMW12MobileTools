@@ -34,18 +34,15 @@ public class SBin {
 	private static final byte[] PLAYLISTS_DATA_TRACK_UNK1 = HEXUtils.decodeHexStr("220005000D000C000000");
 	private static final byte[] PLAYLISTS_DATA_TRACK_UNK2 = HEXUtils.decodeHexStr("07000D0016000000");
 	private static final byte[] PLAYLISTS_DATA_TRACK_UNK3 = HEXUtils.decodeHexStr("08000D0020000000");
-	//
-	private static final String FIRST_DATA_STRUCTNAME = "FirstDATAElement";
-	private static final String HEX_DATA_TYPE = "HEXData";
 	
 	private static int curPos = 0x0;
 	
 	//
 	
-	public static void startup() {
-		SBinMapUtils.initMapTypes();
-		SBinHCStructs.initHCStructs();
+	public static void startup(String[] args) {
 		SBJson.initNewSBJson();
+		LaunchParameters.checkLaunchParameters(args);
+		SBinMapUtils.initMapTypes();
 	}
 
 	public void unpackSBin(String fileType, String filePath) throws IOException, InterruptedException {
@@ -62,6 +59,7 @@ public class SBin {
 		}
 		SBJson.get().setFileName(sbinFilePath.getFileName().toString());
 		SBJson.get().setSBinVersion(sbinVersion);
+		SBinHCStructs.initHCStructs();
 		
 		changeCurPos(0x8); // Skip SBin header + version
 
@@ -94,7 +92,7 @@ public class SBin {
 		updateEnumRelatedObjects();
 		// Used for separate file editors, not all of .sb files gets proper objects layouts
 		switch(SBJson.get().getSBinType()) {
-		case PLAYLISTS:
+		case PLAYLISTS: // TODO Re-write to new HC Structs system
 			unpackPlaylistsData(dataBlock);
 			break;
 		case TEXTURE:
@@ -112,6 +110,7 @@ public class SBin {
 
 	public void repackSBin(String filePath) throws IOException {
 		SBJson.loadSBJson(filePath);
+		SBinHCStructs.initHCStructs();
 		if (SBJson.get().getSBinType() == SBinType.TEXTURE) {
 			TextureUtils.checkForImageFormatOperations();
 		}
@@ -328,9 +327,6 @@ public class SBin {
 		case MAP:
 			//System.out.println(HEXUtils.hexToString(elementHex));
 			processDataMap(elementHex, element, SBinMapUtils.getMapType(element.getStructName()));
-			break;
-		case FIRST_DATA_ELEMENT:
-			processFirstDATAEntry(elementHex, element);
 			break;
 		case STRUCT:
 			List<SBinDataField> fields = new ArrayList<>();
@@ -700,12 +696,6 @@ public class SBin {
 			//System.out.println("hex: " + HEXUtils.hexToString(elementHex));
 			element.setGlobalType(SBinDataGlobalType.MAP);
 		} 
-		else if (i == 0 && (elementHex.length == 0x10 || elementHex.length == 0x12) ) {
-			// The first DATA element is probably some unique structure, but we parse it too since it contains one of CDAT strings
-			// TODO Some files have different DATA structure even with objects (e.g car configs)
-			processFirstDATAEntry(elementHex, element);
-			element.setGlobalType(SBinDataGlobalType.FIRST_DATA_ELEMENT);
-		} 
 		else if (!SBJson.get().getStructs().isEmpty() && SBJson.get().getStructs().size() > structId) {
 			SBinStruct struct = SBJson.get().getStructs().get(structId);
 			if (struct != null && isValidObject(structId, struct, elementHex.length)) {
@@ -717,14 +707,12 @@ public class SBin {
 	}
 	
 	private boolean processHCStructs(byte[] elementHex, SBinDataElement element, int structId) {
-		if (SBJson.get().getSBinType().equals(SBinType.COMMON) ||
-				SBJson.get().getSBinType().equals(SBinType.TEXTURE) ||
-				SBinHCStructs.isExceptionForHCStructs(elementHex, structId)) {
+		if (SBinHCStructs.isExceptionForHCStructs(elementHex, structId)) {
 			return false;
 		}
 		SBinHCStruct hcStruct = SBinHCStructs.getHCStruct(structId);
 		if (hcStruct == null) {return false;}
-		hcStruct.setHCStructId(structId);
+		hcStruct.setHCStructId(structId); // Could be not Id at all, but anyway we must link it to something
 		
 		element.setHCStruct(hcStruct);
 		element.setGlobalType(SBinDataGlobalType.HC_STRUCT);
@@ -792,42 +780,11 @@ public class SBin {
 		}
 	}
 	
-	private void processFirstDATAEntry(byte[] elementHex, SBinDataElement element) {
-		element.setStructName(FIRST_DATA_STRUCTNAME);
-		List<SBinDataField> fields = new ArrayList<>();
-		
-		SBinDataField hex1 = new SBinDataField();
-		hex1.setName("HEXData_Part1");
-		hex1.setType(HEX_DATA_TYPE);
-		hex1.setValue(HEXUtils.hexToString(Arrays.copyOfRange(elementHex, 0, 4)));
-		hex1.setForcedHexValue(true);
-		fields.add(hex1);
-		
-		SBinDataField cdatString = new SBinDataField();
-		cdatString.setName("CDATString");
-		cdatString.setType("CHDR_ID_REF");
-		cdatString.setValue(DataUtils.getCDATStringByShortCHDRId(elementHex, 4, 6));
-		fields.add(cdatString);
-		
-		SBinDataField hex2 = new SBinDataField();
-		hex2.setName("HEXData_Part2");
-		hex2.setType(HEX_DATA_TYPE);
-		hex2.setValue(HEXUtils.hexToString(Arrays.copyOfRange(elementHex, 6, elementHex.length)));
-		hex2.setForcedHexValue(true);
-		fields.add(hex2);
-		element.setFields(fields);
-	}
-	
 	private boolean cancelExceptionsForDATAElements(byte[] elementHex, int i, int structId) {
 		if (SBJson.get().getSBinType().equals(SBinType.LAYOUTS)) {
-			if (structId == 0x5 || // Doesn't fit Struct #5, looks like 0xF map instead
-					(i != 0 && structId == 0x1) ) { // Doesn't fit Struct #1, it was re-used for StructArray primarily
+			if (structId == 0x5) { // Doesn't fit Struct #5, usually empty or with weird size
 				return true; 
 			}
-		} else if (SBJson.get().getSBinType().equals(SBinType.CAR_CONFIG)) {
-			if (structId == 0x1 && elementHex.length > 0xC) { // Doesn't fit Struct #1
-				return true; 
-			} 
 		}
 		return false;
 	}
@@ -1051,13 +1008,6 @@ public class SBin {
 			break;
 		case HC_STRUCT: // Hardcoded struct
 			dataElementStream.write(SBinHCStructs.repackHCStructs(dataEntry));
-			break;
-		case FIRST_DATA_ELEMENT:
-			for (SBinDataField dataField : dataEntry.getFields()) {
-				dataElementStream.write(dataField.getType().contentEquals(HEX_DATA_TYPE)
-						? HEXUtils.decodeHexStr(dataField.getValue())
-						: DataUtils.processStringInCDAT(dataField.getValue()));
-			}
 			break;
 		case MAP:
 			// Map or Enum

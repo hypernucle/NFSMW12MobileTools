@@ -17,27 +17,34 @@ import util.json.JsonClassType;
 public class SBinHCStructs {
 	private SBinHCStructs() {}
 	
-	private static final String HCS_TYPE_CAR_CONFIG_PROPS = "CarConfigProperties";
-	private static final String HCS_TYPE_CAR_CONFIG_AXLE_CFG = "CarConfigAxleCFG";
-	private static final String HCS_TYPE_CAR_CONFIG_ATTRIB = "CarConfigAttribute";
-	private static final int CAR_CONFIG_HEADER_SIZE = 0x4;
+	private static final String HCS_TYPE_PROPSBASE = "PropertiesBase";
+	private static final int PROPSBASE_HEADER_SIZE = 0x4;
 	
-	private static Map<Integer, SBinHCStruct> carConfigList = new HashMap<>();
+	private static Map<Integer, SBinHCStruct> hcStructsList = new HashMap<>();
 	
+	// ! That Switch & Case structure is done here intentionally, due to unknown and varied Struct formation methods from file to file
+	
+	// Must be loaded after Json & SBinType initialization
 	public static void initHCStructs() {
-		carConfigList.putIfAbsent(0x2, new SBHCSCarConfigAttribute());
-		carConfigList.putIfAbsent(0x6, new SBHCSCarConfigAxleCFG());
-		carConfigList.putIfAbsent(0xD, new SBHCSCarConfigProperties());
+		switch(SBJson.get().getSBinType()) {
+		case CAR_CONFIG:
+			hcStructsList.putIfAbsent(0x1, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x2, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x6, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0xD, new SBHCSPropertiesBase());
+			break;
+		case LAYOUTS:
+			hcStructsList.putIfAbsent(0x1, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0xC, new SBHCSPropertiesBase());
+			break;
+		default: 
+			hcStructsList.putIfAbsent(0x1, new SBHCSPropertiesBase());
+			break;
+		}
 	}
 	
 	public static SBinHCStruct getHCStruct(Integer structId) {
-		SBinHCStruct hcStruct = null;
-		switch(SBJson.get().getSBinType()) {
-		case CAR_CONFIG:
-			hcStruct = carConfigList.getOrDefault(structId, null);
-			break;
-		default: break;
-		}
+		SBinHCStruct hcStruct = hcStructsList.getOrDefault(structId, null);
 		return hcStruct != null ? hcStruct.newClass() : null;
 	}
 	
@@ -50,20 +57,28 @@ public class SBinHCStructs {
 		case CAR_CONFIG:
 			
 			switch(structId) {
-			case 0x2:
-				unpackCarConfigAttributeObj(elementHex, element);
-				break;
-			case 0x6:
-				unpackCarConfigAxleCFGObj(elementHex, element);
-				break;
-			case 0xD:
-				unpackCarConfigPropertiesObj(elementHex, element);
+			case 0x1: case 0x2: case 0x6: case 0xD:
+				unpackPropertiesBaseObj(elementHex, element);
 				break;
 			default: break;
 			}
 			
  			break;
-		default: break;
+		case LAYOUTS:
+			
+			switch(structId) {
+			case 0x1: case 0xC:
+				unpackPropertiesBaseObj(elementHex, element);
+				break;
+			default: break;
+			}
+			
+ 			break;
+		default: 
+			if (structId == 0x1) {
+				unpackPropertiesBaseObj(elementHex, element);
+			}
+			break;
 		}
 	}
 	
@@ -73,20 +88,28 @@ public class SBinHCStructs {
 		case CAR_CONFIG:
 			
 			switch(element.getHCStruct().getHCStructId()) {
-			case 0x2:
-				hcStructBytes = repackCarConfigAttributeObj(element);
-				break;
-			case 0x6:
-				hcStructBytes = repackCarConfigAxleCFGObj(element);
-				break;
-			case 0xD:
-				hcStructBytes = repackCarConfigPropertiesObj(element);
+			case 0x1: case 0x2: case 0x6: case 0xD:
+				hcStructBytes = repackPropertiesBaseObj(element);
 				break;
 			default: break;
 			}
 			
  			break;
-		default: break;
+		case LAYOUTS:
+			
+			switch(element.getHCStruct().getHCStructId()) {
+			case 0x1: case 0xC:
+				hcStructBytes = repackPropertiesBaseObj(element);
+				break;
+			default: break;
+			}
+			
+ 			break;
+		default: 
+			if (element.getHCStruct().getHCStructId() == 0x1) {
+				hcStructBytes = repackPropertiesBaseObj(element);
+			}
+			break;
 		}
 		if (hcStructBytes == null) {
 			throw new NullPointerException("!!! HC Struct for Id " + element.getHCStruct().getHCStructId() + " is referenced, but does not exist.");
@@ -95,20 +118,43 @@ public class SBinHCStructs {
 	}
 	
 	// Sometimes one Struct Id could be re-used for both SBin & Hardcoded structs in the same file
+	// Values include possible 1/2 byte padding
 	public static boolean isExceptionForHCStructs(byte[] elementHex, int structId) {
 		boolean notHCStruct = false;
 		switch(SBJson.get().getSBinType()) {
 		case CAR_CONFIG:
 			
 			switch(structId) {
+			case 0x1:
+				notHCStruct = elementHex.length < 0xD;
+				break;
 			case 0x2:
-				notHCStruct = structId == 0x2 && elementHex.length < 0x9;
+				notHCStruct = elementHex.length < 0x9;
 				break;
 			default: break;
 			}
 			
  			break;
-		default: break;
+		case LAYOUTS:
+			
+			switch(structId) {
+			case 0x1:
+				notHCStruct = elementHex.length < 0xD;
+				break;
+			case 0xC:
+				notHCStruct = elementHex.length < 0x13;
+				break;
+			default: break;
+			}
+			
+ 			break;
+		default: 
+			if (structId == 0x1) {
+				notHCStruct = (elementHex.length != 0x10 && elementHex.length != 0x12)
+						|| HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4)) > 0xFF // ... too big?
+						|| elementHex[6] > 0x16; // ... too high field type?
+			} // Exists in many other SBin files, usually on first slot
+			break;
 		}
 		return notHCStruct;
 	}
@@ -117,46 +163,23 @@ public class SBinHCStructs {
 	//
 	//
 	
-	private static void unpackCarConfigPropertiesObj(byte[] elementHex, SBinDataElement element) {
-		int propertySize = 0xC;
-		int arrayCount = 0xD;
+	private static void unpackPropertiesBaseObj(byte[] elementHex, SBinDataElement element) {
+		SBHCSPropertiesBase propsObj = (SBHCSPropertiesBase)element.getHCStruct();
+		propsObj.setType(HCS_TYPE_PROPSBASE);
+		int byteSize = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4));
+		checkDATAPadding(elementHex, byteSize, element);
 		
-		SBHCSCarConfigProperties propertiesObj = (SBHCSCarConfigProperties)element.getHCStruct();
-		propertiesObj.setType(HCS_TYPE_CAR_CONFIG_PROPS);
-		propertiesObj.setHeaderHex(HEXUtils.hexToString(Arrays.copyOfRange(elementHex, 0, 4)));
-		int bytesTaken = CAR_CONFIG_HEADER_SIZE + propertySize * arrayCount; // No idea if header value is also about the array size
-		checkDATAPadding(elementHex, bytesTaken, element);
-		
-		propertiesObj.setCarConfigProperties(readCarConfigPropertyList(CAR_CONFIG_HEADER_SIZE, bytesTaken, elementHex));
+		propsObj.setProperties(readPropertyList(PROPSBASE_HEADER_SIZE, byteSize, elementHex));
 	}
 	
-	private static void unpackCarConfigAxleCFGObj(byte[] elementHex, SBinDataElement element) {
-		SBHCSCarConfigAxleCFG axleCFGObj = (SBHCSCarConfigAxleCFG)element.getHCStruct();
-		axleCFGObj.setType(HCS_TYPE_CAR_CONFIG_AXLE_CFG);
-		axleCFGObj.setByteSize(HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4)));
-		checkDATAPadding(elementHex, axleCFGObj.getByteSize(), element);
-		
-		axleCFGObj.setAxleProperties(readCarConfigPropertyList(
-				CAR_CONFIG_HEADER_SIZE, axleCFGObj.getByteSize(), elementHex));
-	}
-	
-	private static void unpackCarConfigAttributeObj(byte[] elementHex, SBinDataElement element) {
-		SBHCSCarConfigAttribute attribObj = (SBHCSCarConfigAttribute)element.getHCStruct();
-		attribObj.setType(HCS_TYPE_CAR_CONFIG_ATTRIB);
-		attribObj.setByteSize(HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4)));
-		checkDATAPadding(elementHex, attribObj.getByteSize(), element);
-		
-		attribObj.setAttributes(readCarConfigPropertyList(
-				CAR_CONFIG_HEADER_SIZE, attribObj.getByteSize(), elementHex));
-	}
-	
-	private static List<SBHCSCarConfigProperty> readCarConfigPropertyList(
+	private static List<SBHCSPropertyEntity> readPropertyList(
 			int headerSize, int elementRealSize, byte[] elementHex) {
-		List<SBHCSCarConfigProperty> props = new ArrayList<>();
-		int bytesTaken = headerSize;
+		//System.out.println(HEXUtils.hexToString(elementHex));
+		List<SBHCSPropertyEntity> props = new ArrayList<>();
+		int bytesTaken = headerSize; // First byte is objects counter
 		
 		while (bytesTaken < elementRealSize) {
-			SBHCSCarConfigProperty entryObj = new SBHCSCarConfigProperty();
+			SBHCSPropertyEntity entryObj = new SBHCSPropertyEntity();
 
 			entryObj.setPropertyNameCHDR(DataUtils.getCDATStringByShortCHDRId(elementHex, bytesTaken, bytesTaken + 2));
 			bytesTaken += 2;
@@ -165,21 +188,35 @@ public class SBinHCStructs {
 					HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, bytesTaken, bytesTaken + 2))));
 			bytesTaken += 2;
 			//
-			entryObj.setOffsetCounter(HEXUtils.hexToString(Arrays.copyOfRange(elementHex, bytesTaken, bytesTaken + 4)));
+			int offsetCounter = HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, bytesTaken, bytesTaken + 4));
+			entryObj.setOffsetCounter(offsetCounter);
 			bytesTaken += 4;
+			if (bytesTaken != offsetCounter) { // ... padding can happen here for some reason
+				bytesTaken += offsetCounter - bytesTaken;
+			}
 			
-			if (entryObj.getValueType().equals(SBinFieldType.FLOAT)) {
+			switch(entryObj.getValueType()) {
+			case INT32: case U_INT32:
+				entryObj.setValue(String.valueOf(HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, bytesTaken, bytesTaken + 4))));
+				bytesTaken += 4;
+				break;
+			case FLOAT:
 				entryObj.setValue(String.valueOf(HEXUtils.bytesToFloat(Arrays.copyOfRange(elementHex, bytesTaken, bytesTaken + 4))));
 				bytesTaken += 4;
-			} 
-			else if (entryObj.getValueType().equals(SBinFieldType.BOOLEAN)) {
+				break;
+			case BOOLEAN:
 				int valueInt = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, bytesTaken, bytesTaken + 4));
 				entryObj.setValue(Boolean.toString(valueInt == 1));
 				bytesTaken += 2;
-			} 
-			else {
+				break;
+			case CHDR_ID_REF:
+				entryObj.setValue(DataUtils.getCDATStringByShortCHDRId(elementHex, bytesTaken, bytesTaken + 2)); 
+				bytesTaken += 2;
+				break;
+			default: 
 				entryObj.setValue(HEXUtils.hexToString(Arrays.copyOfRange(elementHex, bytesTaken, bytesTaken + 4))); 
 				bytesTaken += 4; // DATA Id reference or other stuff
+				break;
 			}
 			props.add(entryObj);
 		}
@@ -187,54 +224,54 @@ public class SBinHCStructs {
 		return props;
 	}
 	
-	private static byte[] repackCarConfigPropertiesObj(SBinDataElement element) throws IOException {
-		ByteArrayOutputStream propertiesBytes = new ByteArrayOutputStream();
-		SBHCSCarConfigProperties propsJson = (SBHCSCarConfigProperties)element.getHCStruct();
-		propertiesBytes.write(HEXUtils.decodeHexStr(propsJson.getHeaderHex()));
+	private static byte[] repackPropertiesBaseObj(SBinDataElement element) throws IOException {
+		SBHCSPropertiesBase propsJson = (SBHCSPropertiesBase)element.getHCStruct();
 		
-		carConfigPropertyToBytes(propsJson.getCarConfigProperties(), propertiesBytes);
-		return propertiesBytes.toByteArray();
-	}
-	
-	private static byte[] repackCarConfigAxleCFGObj(SBinDataElement element) throws IOException {
-		ByteArrayOutputStream axleCFGBytes = new ByteArrayOutputStream();
-		SBHCSCarConfigAxleCFG axleCFGJson = (SBHCSCarConfigAxleCFG)element.getHCStruct();
-		axleCFGBytes.write(HEXUtils.shortToBytes(axleCFGJson.getHCStructId()));
-		axleCFGBytes.write(HEXUtils.shortToBytes(axleCFGJson.getByteSize()));
-		
-		carConfigPropertyToBytes(axleCFGJson.getAxleProperties(), axleCFGBytes);
-		return axleCFGBytes.toByteArray();
-	}
-	
-	private static byte[] repackCarConfigAttributeObj(SBinDataElement element) throws IOException {
-		ByteArrayOutputStream attribBytes = new ByteArrayOutputStream();
-		SBHCSCarConfigAttribute attribJson = (SBHCSCarConfigAttribute)element.getHCStruct();
-		attribBytes.write(HEXUtils.shortToBytes(attribJson.getHCStructId()));
-		attribBytes.write(HEXUtils.shortToBytes(attribJson.getByteSize()));
-		
-		carConfigPropertyToBytes(attribJson.getAttributes(), attribBytes);
-		return attribBytes.toByteArray();
-	}
-	
-	private static void carConfigPropertyToBytes(List<SBHCSCarConfigProperty> props, ByteArrayOutputStream propertiesBytes) throws IOException {
-		for (SBHCSCarConfigProperty property : props) {
-			propertiesBytes.write(DataUtils.processStringInCDAT(property.getPropertyNameCHDR()));
-			propertiesBytes.write(HEXUtils.shortToBytes(property.getValueType().getId()));
-			propertiesBytes.write(HEXUtils.decodeHexStr(property.getOffsetCounter()));
+		int bytesTaken = PROPSBASE_HEADER_SIZE; // First byte is objects counter
+		ByteArrayOutputStream propsBytes = new ByteArrayOutputStream();
+		for (SBHCSPropertyEntity property : propsJson.getProperties()) {
+			propsBytes.write(DataUtils.processStringInCDAT(property.getPropertyNameCHDR()));
+			propsBytes.write(HEXUtils.shortToBytes(property.getValueType().getId()));
+			propsBytes.write(HEXUtils.intToByteArrayLE(property.getOffsetCounter()));
+			bytesTaken += 8; // 2 + 2 + 4
+			if (property.getOffsetCounter() != bytesTaken) {
+				int pad = property.getOffsetCounter() - bytesTaken;
+				propsBytes.write(new byte[pad]);
+				bytesTaken += pad;
+			}
 			
-			if (property.getValueType().equals(SBinFieldType.FLOAT)) {
-				propertiesBytes.write(HEXUtils.floatToBytes(Float.parseFloat(property.getValue())));
-			} 
-			else if (property.getValueType().equals(SBinFieldType.BOOLEAN)) {
+			switch(property.getValueType()) {
+			case INT32: case U_INT32:
+				propsBytes.write(HEXUtils.intToByteArrayLE(Integer.parseInt(property.getValue())));
+				bytesTaken += 4;
+				break;
+			case FLOAT:
+				propsBytes.write(HEXUtils.floatToBytes(Float.parseFloat(property.getValue())));
+				bytesTaken += 4;
+				break;
+			case BOOLEAN:
 				int bool = Boolean.parseBoolean(property.getValue()) ? 0x1 : 0x0;
-				propertiesBytes.write(new byte[] {(byte)bool, 0x0});
-			} 
-			else {
-				propertiesBytes.write(HEXUtils.decodeHexStr(property.getValue()));
+				propsBytes.write(new byte[] {(byte)bool, 0x0});
+				bytesTaken += 2;
+				break;
+			case CHDR_ID_REF:
+				propsBytes.write(DataUtils.processStringInCDAT(property.getValue()));
+				bytesTaken += 2;
+				break;
+			default:
+				propsBytes.write(HEXUtils.decodeHexStr(property.getValue()));
+				bytesTaken += 4;
+				break;
 			}
 		}
+		
+		ByteArrayOutputStream finalPropsBytes = new ByteArrayOutputStream();
+		finalPropsBytes.write(HEXUtils.shortToBytes(propsJson.getProperties().size()));
+		finalPropsBytes.write(HEXUtils.shortToBytes(PROPSBASE_HEADER_SIZE + propsBytes.size())); // Full element size
+		finalPropsBytes.write(propsBytes.toByteArray());
+		return finalPropsBytes.toByteArray();
 	}
-	
+
 	//
 	//
 	//
@@ -250,91 +287,30 @@ public class SBinHCStructs {
 	//
 	//
 	
-	public static class SBHCSCarConfigAttribute extends SBinHCStruct {
-		@SerializedName("ByteSize")
-		private int byteSize;
-		@SerializedName("CarConfigAttribute")
-		private List<SBHCSCarConfigProperty> attributes;
+	public static class SBHCSPropertiesBase extends SBinHCStruct {
+		@SerializedName("Properties")
+		private List<SBHCSPropertyEntity> properties;
 		
 		@Override
 		public SBinHCStruct newClass() {
-			return new SBHCSCarConfigAttribute();
+			return new SBHCSPropertiesBase();
 		}
 
-		public int getByteSize() {
-			return byteSize;
+		public List<SBHCSPropertyEntity> getProperties() {
+			return properties;
 		}
-		public void setByteSize(int byteSize) {
-			this.byteSize = byteSize;
-		}
-
-		public List<SBHCSCarConfigProperty> getAttributes() {
-			return attributes;
-		}
-		public void setAttributes(List<SBHCSCarConfigProperty> attributes) {
-			this.attributes = attributes;
+		public void setProperties(List<SBHCSPropertyEntity> properties) {
+			this.properties = properties;
 		}
 	}
 	
-	public static class SBHCSCarConfigAxleCFG extends SBinHCStruct {
-		@SerializedName("ByteSize")
-		private int byteSize;
-		@SerializedName("AxleProperties")
-		private List<SBHCSCarConfigProperty> axleProperties;
-		
-		@Override
-		public SBinHCStruct newClass() {
-			return new SBHCSCarConfigAxleCFG();
-		}
-		
-		public int getByteSize() {
-			return byteSize;
-		}
-		public void setByteSize(int byteSize) {
-			this.byteSize = byteSize;
-		}
-
-		public List<SBHCSCarConfigProperty> getAxleProperties() {
-			return axleProperties;
-		}
-		public void setAxleProperties(List<SBHCSCarConfigProperty> axleProperties) {
-			this.axleProperties = axleProperties;
-		}
-	}
-	
-	public static class SBHCSCarConfigProperties extends SBinHCStruct {
-		@SerializedName("HeaderHex")
-		private String headerHex;
-		@SerializedName("CarConfigProperties")
-		private List<SBHCSCarConfigProperty> carConfigProperties;
-		
-		@Override
-		public SBinHCStruct newClass() {
-			return new SBHCSCarConfigProperties();
-		}
-
-		public String getHeaderHex() {
-			return headerHex;
-		}
-		public void setHeaderHex(String headerHex) {
-			this.headerHex = headerHex;
-		}
-		
-		public List<SBHCSCarConfigProperty> getCarConfigProperties() {
-			return carConfigProperties;
-		}
-		public void setCarConfigProperties(List<SBHCSCarConfigProperty> carConfigProperties) {
-			this.carConfigProperties = carConfigProperties;
-		}
-	}
-	
-	public static class SBHCSCarConfigProperty {
+	public static class SBHCSPropertyEntity {
 		@SerializedName("PropertyNameCHDR")
 		private String propertyNameCHDR;
 		@SerializedName("ValueType")
 		private SBinFieldType valueType;
 		@SerializedName("OffsetCounter")
-		private String offsetCounter;
+		private int offsetCounter;
 		@SerializedName("Value")
 		private String value;
 		
@@ -352,10 +328,10 @@ public class SBinHCStructs {
 			this.valueType = valueType;
 		}
 		
-		public String getOffsetCounter() {
+		public int getOffsetCounter() {
 			return offsetCounter;
 		}
-		public void setOffsetCounter(String offsetCounter) {
+		public void setOffsetCounter(int offsetCounter) {
 			this.offsetCounter = offsetCounter;
 		}
 		
@@ -369,9 +345,7 @@ public class SBinHCStructs {
 	
 	@JsonClassType(property = "Type",
 		subTypes = {
-			@JsonClassSubType(jsonClass = SBHCSCarConfigProperties.class, name = HCS_TYPE_CAR_CONFIG_PROPS),
-			@JsonClassSubType(jsonClass = SBHCSCarConfigAxleCFG.class, name = HCS_TYPE_CAR_CONFIG_AXLE_CFG),
-			@JsonClassSubType(jsonClass = SBHCSCarConfigAttribute.class, name = HCS_TYPE_CAR_CONFIG_ATTRIB)
+			@JsonClassSubType(jsonClass = SBHCSPropertiesBase.class, name = HCS_TYPE_PROPSBASE)
 		}
 	)
 	public static class SBinHCStruct {

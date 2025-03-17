@@ -39,7 +39,8 @@ public class DataUtils {
 	
 	public static SBinDataElement getDataElementByStructName(String structName) {
 		for (SBinDataElement dataElement : SBJson.get().getDataElements()) {
-			if (dataElement.getStructName().contentEquals(structName)) {
+			if (dataElement.getStructName() != null &&
+					dataElement.getStructName().contentEquals(structName)) {
 				return dataElement;
 			}
 		}
@@ -49,7 +50,8 @@ public class DataUtils {
 	public static List<SBinDataElement> getAllDataElementsByStructName(String structName) {
 		List<SBinDataElement> elements = new ArrayList<>();
 		for (SBinDataElement dataElement : SBJson.get().getDataElements()) {
-			if (dataElement.getStructName().contentEquals(structName)) {
+			if (dataElement.getStructName() != null && 
+					dataElement.getStructName().contentEquals(structName)) {
 				elements.add(dataElement);
 			}
 		}
