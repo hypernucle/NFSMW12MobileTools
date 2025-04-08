@@ -37,6 +37,25 @@ public class SBinHCStructs {
 			hcStructsList.putIfAbsent(0x1, new SBHCSPropertiesBase());
 			hcStructsList.putIfAbsent(0xC, new SBHCSPropertiesBase());
 			break;
+		case DEBUG_OPTIONS:
+			hcStructsList.putIfAbsent(0x44, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x2, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x4, new SBHCSPropertiesBase());
+			break;
+		case TWEAKS:
+			hcStructsList.putIfAbsent(0x2, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x3, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x4, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x5, new SBHCSPropertiesBase()); // int map?
+			hcStructsList.putIfAbsent(0x6, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x262, new SBHCSPropertiesBase());
+			break;
+		case MAPOW:
+			hcStructsList.putIfAbsent(0x3, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x5, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x2, new SBHCSPropertiesBase());
+			hcStructsList.putIfAbsent(0x1, new SBHCSPropertiesBase());
+			break;
 		default: 
 			hcStructsList.putIfAbsent(0x1, new SBHCSPropertiesBase());
 			break;
@@ -74,6 +93,41 @@ public class SBinHCStructs {
 			}
 			
  			break;
+		case DEBUG_OPTIONS:
+			
+			switch(structId) {
+			case 0x44: case 0x2: case 0x4:
+				unpackPropertiesBaseObj(elementHex, element);
+				break;
+			default: break;
+			}
+			
+ 			break;
+		case TWEAKS:
+			
+			switch(structId) {
+			case 0x2: case 0x3: case 0x4: case 0x6: case 0x262:
+				unpackPropertiesBaseObj(elementHex, element);
+				break;
+			case 0x5:
+				if (HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4)) != 0x00) {
+					unpackPropertiesBaseObj(elementHex, element);
+				}
+				break;
+			default: break;
+			}
+			
+ 			break;
+		case MAPOW:
+			
+			switch(structId) {
+			case 0x1: case 0x2: case 0x3: case 0x5:
+				unpackPropertiesBaseObj(elementHex, element);
+				break;
+			default: break;
+			}
+			
+ 			break;
 		default: 
 			if (structId == 0x1) {
 				unpackPropertiesBaseObj(elementHex, element);
@@ -99,6 +153,36 @@ public class SBinHCStructs {
 			
 			switch(element.getHCStruct().getHCStructId()) {
 			case 0x1: case 0xC:
+				hcStructBytes = repackPropertiesBaseObj(element);
+				break;
+			default: break;
+			}
+			
+ 			break;
+		case DEBUG_OPTIONS:
+			
+			switch(element.getHCStruct().getHCStructId()) {
+			case 0x44: case 0x2: case 0x4:
+				hcStructBytes = repackPropertiesBaseObj(element);
+				break;
+			default: break;
+			}
+			
+ 			break;
+		case MAPOW:
+			
+			switch(element.getHCStruct().getHCStructId()) {
+			case 0x1: case 0x2: case 0x3: case 0x5:
+				hcStructBytes = repackPropertiesBaseObj(element);
+				break;
+			default: break;
+			}
+			
+ 			break;
+		case TWEAKS:
+			
+			switch(element.getHCStruct().getHCStructId()) {
+			case 0x2: case 0x3: case 0x4: case 0x5: case 0x6: case 0x262:
 				hcStructBytes = repackPropertiesBaseObj(element);
 				break;
 			default: break;
@@ -148,6 +232,17 @@ public class SBinHCStructs {
 			}
 			
  			break;
+		case TWEAKS:
+			
+			switch(structId) {
+			case 0x5:
+				notHCStruct = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4)) == 0x00;
+				break;
+			default: break;
+			}
+			
+ 			break;
+ 			
 		default: 
 			if (structId == 0x1) {
 				notHCStruct = (elementHex.length != 0x10 && elementHex.length != 0x12)

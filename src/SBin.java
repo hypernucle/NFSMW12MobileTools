@@ -620,6 +620,7 @@ public class SBin {
 			int remainder = elementOHDR % 0x8;
 			element.setOHDRPadRemainder(remainder);
 			
+			//System.out.println("hexId: " + element.getOrderHexId());
 			detectElementStruct(elementHex, i, element);
 			if (element.getGlobalType().equals(SBinDataGlobalType.UNKNOWN)) {
 				fillElementHexValue(element, elementHex);
@@ -643,7 +644,7 @@ public class SBin {
 		boolean beginOnBlockStart = ohdrPrevValue % 4 == 0;
 		int partialLastBlockTakenBytes = elementEnd % 4;
 		int paddingSize = 0x0;
-		boolean hack = false;
+		boolean doNotCalc = false;
 		
 		boolean partialLastBlockQuestion = false;
 		if (element.getGlobalType().equals(SBinDataGlobalType.STRUCT)) {
@@ -657,19 +658,18 @@ public class SBin {
 			SBinMapType mapType = SBinMapUtils.getMapType(element.getStructName());
 			int mapElementsCount = HEXUtils.byteArrayToInt(Arrays.copyOfRange(elementHex, 4, 8));
 			if (!mapType.isStructArray()) {
-				int mapByteSize = SBinMapUtils.HEADERFULL_SIZE + mapElementsCount * mapType.getEntrySize();
+				int mapByteSize = SBinMapUtils.HEADERFULL_SIZE + (mapElementsCount * mapType.getEntrySize());
 				paddingSize = elementHex.length - mapByteSize;
 			} 
 			else if (mapElementsCount == 0) { // Empty StructArray always have the same size
 				paddingSize = elementHex.length - SBinMapUtils.HEADERFULL_SIZE;
 			} 
-			else {
-				hack = true;
-			} // TODO Fails to work well with StructArrays, due to missing sizes of each last element
+			doNotCalc = true; // ignore for StructArrays after all
+			// TODO Fails to work well with StructArrays, due to missing sizes of each last element
 		}
 		
 		boolean lastBlockPartialData = partialLastBlockTakenBytes != 0 && !partialLastBlockQuestion;
-		if (!hack && remainder == 0x0 && paddingSize == 0x0 && lastBlockPartialData) {
+		if (!doNotCalc && remainder == 0x0 && paddingSize == 0x0 && lastBlockPartialData) {
 			paddingSize = beginOnBlockStart 
 					? partialLastBlockTakenBytes
 					: 0x4 - partialLastBlockTakenBytes;

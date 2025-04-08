@@ -16,6 +16,12 @@ public class LaunchParameters {
 			SBJson.get().setSBinType(SBinType.LAYOUTS);
 		} else if (args[2].contentEquals("playlists.sb")) {
 			SBJson.get().setSBinType(SBinType.PLAYLISTS);
+		} else if (args[2].contentEquals("debug_options.sb")) {
+			SBJson.get().setSBinType(SBinType.DEBUG_OPTIONS);
+		} else if (args[2].contentEquals("tweaks.sb")) {
+			SBJson.get().setSBinType(SBinType.TWEAKS);
+		} else if (args[2].contentEquals("map_overworld.sb")) {
+			SBJson.get().setSBinType(SBinType.MAPOW);
 		} else if (args[2].endsWith(".config")) {
 			SBJson.get().setSBinType(SBinType.CAR_CONFIG);
 		} 
