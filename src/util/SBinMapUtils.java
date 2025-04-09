@@ -70,7 +70,7 @@ public class SBinMapUtils {
 		return false;
 	}
 	
-	private static boolean isMapPropertiesValid(byte[] elementHex) {
+	public static boolean isMapPropertiesValid(byte[] elementHex) {
 		if (elementHex.length < 0x5) {return false;} // ???
 		int arrayCount = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 4, 6));
 		if (HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 6, 8)) != 0x0

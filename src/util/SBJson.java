@@ -5,12 +5,14 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 import util.DataClasses.SBinField;
+import util.DataClasses.SBinHCStructFileArray;
 import util.DataClasses.SBinJson;
 import util.DataClasses.SBinStruct;
 import util.SBinHCStructs.SBinHCStruct;
@@ -20,15 +22,20 @@ public class SBJson {
 	
 	static Gson gson = new Gson();
 	private static SBinJson sbinJsonEnt;
+	private static SBinHCStructFileArray hcStructFileArray;
 	
 	private SBJson() {}
 	
 	public static SBinJson get() {
 		return sbinJsonEnt;
 	}
+	public static List<String> getHCStructFileArray() {
+		return hcStructFileArray.getFileNames();
+	}
 	
-	public static void initNewSBJson() {
+	public static void initNewSBJson() throws IOException {
 		sbinJsonEnt = new SBinJson();
+		loadHCStructsFileArray();
 	}
 	
 	public static void loadSBJson(String filePath) throws IOException {
@@ -39,6 +46,14 @@ public class SBJson {
 		SBinJson sbinJsonObj = gson.fromJson(reader, new TypeToken<SBinJson>(){}.getType());
 		reader.close();
 		sbinJsonEnt = sbinJsonObj;
+	}
+	
+	private static void loadHCStructsFileArray() throws IOException {
+		Reader reader = Files.newBufferedReader(Paths.get("HCStructFileArray.json"), StandardCharsets.UTF_8);
+		SBinHCStructFileArray hcStructFiles = gson.fromJson(reader, new TypeToken<SBinHCStructFileArray>(){}.getType());
+		System.out.println(hcStructFiles.getFileNames().size());
+		reader.close();
+		hcStructFileArray = hcStructFiles;
 	}
 	
 	public static void outputSBJson() throws IOException {

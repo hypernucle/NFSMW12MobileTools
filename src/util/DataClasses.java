@@ -584,6 +584,18 @@ public final class DataClasses {
 		}
 	}
 	
+	public static class SBinHCStructFileArray {
+		@SerializedName("Array")
+		private List<String> fileNames = new ArrayList<>();
+
+		public List<String> getFileNames() {
+			return fileNames;
+		}
+		public void setFileNames(List<String> fileNames) {
+			this.fileNames = fileNames;
+		}
+	}
+	
 	public static class SBinPlaylistObj {
 		@SerializedName("OHDRDescRemainder")
 		private int ohdrDescRemainder = 0;

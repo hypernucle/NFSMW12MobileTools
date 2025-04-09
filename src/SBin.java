@@ -39,7 +39,7 @@ public class SBin {
 	
 	//
 	
-	public static void startup(String[] args) {
+	public static void startup(String[] args) throws IOException {
 		SBJson.initNewSBJson();
 		LaunchParameters.checkLaunchParameters(args);
 		SBinMapUtils.initMapTypes();
@@ -59,7 +59,6 @@ public class SBin {
 		}
 		SBJson.get().setFileName(sbinFilePath.getFileName().toString());
 		SBJson.get().setSBinVersion(sbinVersion);
-		SBinHCStructs.initHCStructs();
 		
 		changeCurPos(0x8); // Skip SBin header + version
 
@@ -110,7 +109,6 @@ public class SBin {
 
 	public void repackSBin(String filePath) throws IOException {
 		SBJson.loadSBJson(filePath);
-		SBinHCStructs.initHCStructs();
 		if (SBJson.get().getSBinType() == SBinType.TEXTURE) {
 			TextureUtils.checkForImageFormatOperations();
 		}
@@ -352,7 +350,7 @@ public class SBin {
 			}
 			element.setFields(fields);
 			break;
-		case UNKNOWN:
+		default: // UNKNOWN
 			fillElementHexValue(element, elementHex);
 			break;
 		}
@@ -710,14 +708,7 @@ public class SBin {
 		if (SBinHCStructs.isExceptionForHCStructs(elementHex, structId)) {
 			return false;
 		}
-		SBinHCStruct hcStruct = SBinHCStructs.getHCStruct(structId);
-		if (hcStruct == null) {return false;}
-		hcStruct.setHCStructId(structId); // Could be not Id at all, but anyway we must link it to something
-		
-		element.setHCStruct(hcStruct);
-		element.setGlobalType(SBinDataGlobalType.HC_STRUCT);
-		SBinHCStructs.unpackHCStructs(elementHex, element, structId);
-		return true;
+		return SBinHCStructs.unpackHCStructs(elementHex, element, structId);
 	}
 	
 	private void processDataMap(byte[] elementHex, SBinDataElement element, SBinMapType mapType) throws IOException {
@@ -781,11 +772,9 @@ public class SBin {
 	}
 	
 	private boolean cancelExceptionsForDATAElements(byte[] elementHex, int i, int structId) {
-		if (SBJson.get().getSBinType().equals(SBinType.LAYOUTS)) {
-			if (structId == 0x5) { // Doesn't fit Struct #5, usually empty or with weird size
-				return true; 
-			}
-		}
+//		if (SBJson.get().getSBinType().equals(SBinType.LAYOUTS)) {
+//			
+//		}
 		return false;
 	}
 	

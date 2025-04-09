@@ -12,19 +12,7 @@ public class LaunchParameters {
 	public static void checkLaunchParameters(String[] args) {
 		if (!args[0].contentEquals("unpack")) {return;}
 		
-		if (args[2].contentEquals("layouts.sb")) {
-			SBJson.get().setSBinType(SBinType.LAYOUTS);
-		} else if (args[2].contentEquals("playlists.sb")) {
-			SBJson.get().setSBinType(SBinType.PLAYLISTS);
-		} else if (args[2].contentEquals("debug_options.sb")) {
-			SBJson.get().setSBinType(SBinType.DEBUG_OPTIONS);
-		} else if (args[2].contentEquals("tweaks.sb")) {
-			SBJson.get().setSBinType(SBinType.TWEAKS);
-		} else if (args[2].contentEquals("map_overworld.sb")) {
-			SBJson.get().setSBinType(SBinType.MAPOW);
-		} else if (args[2].endsWith(".config")) {
-			SBJson.get().setSBinType(SBinType.CAR_CONFIG);
-		} 
+		SBJson.get().setSBinType(getSBinTypeByFileName(args[2]));
 		
 		if (args.length != 4) {return;}
 		
@@ -44,6 +32,22 @@ public class LaunchParameters {
 			System.out.println("### Wrong Launch Parameter: " + args[3] + ", ignored.");
 			break;
 		}
+	}
+	
+	private static SBinType getSBinTypeByFileName(String fileName) {
+		if (SBJson.getHCStructFileArray().contains(fileName)) {
+			return SBinType.HCSTRUCTS_COMMON;
+		} 
+		else if (fileName.contentEquals("layouts.sb")) {
+			return SBinType.LAYOUTS;
+		} else if (fileName.contentEquals("playlists.sb")) {
+			return SBinType.PLAYLISTS;
+		} else if (fileName.contentEquals("tweaks.sb") || fileName.contentEquals("tweaks_ipad.sb")) {
+			return SBinType.TWEAKS;
+		} else if (fileName.endsWith(".config")) {
+			return SBinType.CAR_CONFIG;
+		} 
+		return SBinType.COMMON;
 	}
 	
 	public static void disableDATAObjectsUnpack() {
