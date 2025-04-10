@@ -45,7 +45,7 @@ public class SBin {
 		SBinMapUtils.initMapTypes();
 	}
 
-	public void unpackSBin(String fileType, String filePath) throws IOException, InterruptedException {
+	public void unpackSBin(String fileType, String filePath, boolean output) throws IOException, InterruptedException {
 		Path sbinFilePath = Paths.get(filePath);
 		byte[] sbinData = Files.readAllBytes(sbinFilePath);
 
@@ -104,11 +104,15 @@ public class SBin {
 		default: break;
 		}
 		SBJson.clearJsonOutputStuff();
-		SBJson.outputSBJson();
+		if (output) {
+			SBJson.outputSBJson();
+		}
 	}
 
-	public void repackSBin(String filePath) throws IOException {
-		SBJson.loadSBJson(filePath);
+	public Path repackSBin(String filePath) throws IOException {
+		if (SBJson.get() == null) { // Already loaded during FileCheck
+			SBJson.loadSBJson(filePath);
+		}
 		if (SBJson.get().getSBinType() == SBinType.TEXTURE) {
 			TextureUtils.checkForImageFormatOperations();
 		}
@@ -145,7 +149,9 @@ public class SBin {
 		fileOutputStr.write(additionalBlocksStream.toByteArray());
 		
 		byte[] fileBytes = fileOutputStr.toByteArray();
-		Files.write(Paths.get("new_" + SBJson.get().getFileName()), fileBytes);
+		Path newFile = Paths.get("new_" + SBJson.get().getFileName());
+		Files.write(newFile, fileBytes);
+		return newFile;
 	}
 
 	public void getFNVHash(String filePath) throws IOException {
@@ -1161,7 +1167,7 @@ public class SBin {
 		//		System.out.println("### curPos: " + Integer.toHexString(curPos));
 	}
 
-	private static void setCurPos(int newPos) {
+	public static void setCurPos(int newPos) {
 		curPos = newPos;
 		//		System.out.println("### curPos: " + Integer.toHexString(curPos));
 	}

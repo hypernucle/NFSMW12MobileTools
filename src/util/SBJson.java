@@ -51,7 +51,7 @@ public class SBJson {
 	private static void loadHCStructsFileArray() throws IOException {
 		Reader reader = Files.newBufferedReader(Paths.get("HCStructFileArray.json"), StandardCharsets.UTF_8);
 		SBinHCStructFileArray hcStructFiles = gson.fromJson(reader, new TypeToken<SBinHCStructFileArray>(){}.getType());
-		System.out.println(hcStructFiles.getFileNames().size());
+		//System.out.println(hcStructFiles.getFileNames().size());
 		reader.close();
 		hcStructFileArray = hcStructFiles;
 	}

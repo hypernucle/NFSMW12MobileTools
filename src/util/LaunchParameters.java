@@ -34,7 +34,7 @@ public class LaunchParameters {
 		}
 	}
 	
-	private static SBinType getSBinTypeByFileName(String fileName) {
+	public static SBinType getSBinTypeByFileName(String fileName) {
 		if (SBJson.getHCStructFileArray().contains(fileName)) {
 			return SBinType.HCSTRUCTS_COMMON;
 		} 

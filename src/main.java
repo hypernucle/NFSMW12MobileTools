@@ -26,13 +26,16 @@ public class main {
 		}
 		switch(args[0]) {
 		case "unpack":
-			sbinTools.unpackSBin(args[1], args[2]);
+			sbinTools.unpackSBin(args[1], args[2], true);
 			break;
 		case "repack":
 			sbinTools.repackSBin(args[1]);
 			break;
 		case "hash":
 			sbinTools.getFNVHash(args[1]);
+			break;
+		case "check":
+			FileCheck.checkFiles(args[1], sbinTools);
 			break;
 		default: 
 			displayHelp();

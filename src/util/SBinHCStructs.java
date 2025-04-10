@@ -31,9 +31,10 @@ public class SBinHCStructs {
 	public static boolean unpackHCStructs(byte[] elementHex, SBinDataElement element, int structId) {
 		boolean isHCStruct = false;
 		
+		//System.out.println(element.getOrderHexId());
 		switch(SBJson.get().getSBinType()) {
 		case CAR_CONFIG: case HCSTRUCTS_COMMON:
-			if (structId != 0xF || !SBinMapUtils.isMapPropertiesValid(elementHex)) { // Regular Map Array?
+			if (!checkForDataIdMap(structId, elementHex)) { // Regular Map Array?
 				unpackPropertiesBaseObj(elementHex, element);
 				isHCStruct = true;
 			}
@@ -46,7 +47,6 @@ public class SBinHCStructs {
 				isHCStruct = true;
 				break;
 			case 0x5:
-				System.out.println(element.getOrderHexId());
 				if (checkForIntegerMap(structId, elementHex)) {
 					unpackIntegerMap(elementHex, element);
 					isHCStruct = true;
@@ -60,7 +60,7 @@ public class SBinHCStructs {
 			if (checkForIntegerMap(structId, elementHex)) {
 				unpackIntegerMap(elementHex, element);
 				isHCStruct = true;
-			} else if (structId != 0xF || !SBinMapUtils.isMapPropertiesValid(elementHex)) { // Regular Map Array?
+			} else if (!checkForDataIdMap(structId, elementHex)) { // Regular Map Array?
 				unpackPropertiesBaseObj(elementHex, element);
 				isHCStruct = true;
 			}
@@ -110,7 +110,7 @@ public class SBinHCStructs {
 		case CAR_CONFIG:
 			
 			switch(structIdCount) {
-			case 0x1:
+			case 0x0: case 0x1:
 				notHCStruct = elementHex.length < 0xD;
 				break;
 			case 0x2:
@@ -305,6 +305,10 @@ public class SBinHCStructs {
 				&& elementHex.length > 7
 				&& HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4)) == 0x00
 				&& HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 6, 8)) == 0x00;
+	}
+	
+	private static boolean checkForDataIdMap(int structId, byte[] elementHex) {
+		return structId == 0xF && SBinMapUtils.isMapPropertiesValid(elementHex);
 	}
 	
 	private static void checkDATAPadding(byte[] elementHex, int bytesTaken, SBinDataElement element) {
