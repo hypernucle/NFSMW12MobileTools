@@ -273,6 +273,8 @@ public final class DataClasses {
 		private int id;
 		@SerializedName("Name")
 		private String name;
+		@SerializedName("Size")
+		private int size;
 		@SerializedName("Fields")
 		private List<SBinField> fieldsArray = new ArrayList<>();
 		
@@ -292,6 +294,13 @@ public final class DataClasses {
 		}
 		public void setName(String name) {
 			this.name = name;
+		}
+		
+		public int getSize() {
+			return size;
+		}
+		public void setSize(int size) {
+			this.size = size;
 		}
 
 		public List<SBinField> getFieldsArray() {

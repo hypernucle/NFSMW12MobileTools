@@ -46,6 +46,8 @@ public class LaunchParameters {
 			return SBinType.TWEAKS;
 		} else if (fileName.endsWith(".config")) {
 			return SBinType.CAR_CONFIG;
+		} else if (fileName.endsWith(".sba")) {
+			return SBinType.TEXTURE;
 		} 
 		return SBinType.COMMON;
 	}

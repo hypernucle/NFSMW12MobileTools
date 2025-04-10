@@ -6,6 +6,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
 import util.FNV1;
 import util.SBinType;
@@ -20,7 +22,6 @@ import util.SBinDataGlobalType;
 import util.SBinEnumUtils;
 import util.SBinFieldType;
 import util.SBinHCStructs;
-import util.SBinHCStructs.SBinHCStruct;
 import util.SBinMapUtils;
 import util.SBinMapUtils.SBinMapType;
 import util.TextureUtils;
@@ -45,14 +46,14 @@ public class SBin {
 		SBinMapUtils.initMapTypes();
 	}
 
-	public void unpackSBin(String fileType, String filePath, boolean output) throws IOException, InterruptedException {
+	public Checksum unpackSBin(String fileType, String filePath, boolean output) throws IOException, InterruptedException {
 		Path sbinFilePath = Paths.get(filePath);
 		byte[] sbinData = Files.readAllBytes(sbinFilePath);
 
 		int sbinVersion = sbinData[4];
 		if (sbinVersion != 0x03) {
 			System.out.println("!!! This SBin version is not supported, version 3 required.");
-			return;
+			return null;
 		}
 		if (SBJson.get().getSBinType() == null) {
 			SBJson.get().setSBinType(SBinType.valueOf(fileType.toUpperCase()));
@@ -106,11 +107,14 @@ public class SBin {
 		SBJson.clearJsonOutputStuff();
 		if (output) {
 			SBJson.outputSBJson();
+		} else {
+			return getFileBytesChecksum(sbinData);
 		}
+		return null;
 	}
 
-	public Path repackSBin(String filePath) throws IOException {
-		if (SBJson.get() == null) { // Already loaded during FileCheck
+	public Checksum repackSBin(String filePath, boolean output) throws IOException {
+		if (output) { // Already loaded during FileCheck
 			SBJson.loadSBJson(filePath);
 		}
 		if (SBJson.get().getSBinType() == SBinType.TEXTURE) {
@@ -149,9 +153,10 @@ public class SBin {
 		fileOutputStr.write(additionalBlocksStream.toByteArray());
 		
 		byte[] fileBytes = fileOutputStr.toByteArray();
-		Path newFile = Paths.get("new_" + SBJson.get().getFileName());
-		Files.write(newFile, fileBytes);
-		return newFile;
+		if (output) {
+			Files.write(Paths.get("new_" + SBJson.get().getFileName()), fileBytes);
+		}
+		return getFileBytesChecksum(fileBytes);
 	}
 
 	public void getFNVHash(String filePath) throws IOException {
@@ -528,6 +533,7 @@ public class SBin {
 			
 			int firstFieldId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 2, 4));
 			int countToNextStruct = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(structBytes, 4, 6));
+			struct.setSize(countToNextStruct); // Re-use of the same Fields happens to de different on various files
 			if (countToNextStruct == 0) {
 				countToNextStruct = 1;
 			}
@@ -677,11 +683,23 @@ public class SBin {
 			paddingSize = beginOnBlockStart 
 					? partialLastBlockTakenBytes
 					: 0x4 - partialLastBlockTakenBytes;
+			if (paddingSize != 0x0 && checkIfPaddingZoneContainsSomething(elementHex, paddingSize)) {
+				paddingSize = 0x0; // Hack for last Field in Sub-Struct, if it's placed on the end of Element
+			}
 		}
 		//System.out.println("pad for " + element.getOrderHexId() + ": " + paddingSize + ", partialLastBlockTakenBytes: " + partialLastBlockTakenBytes + ", remainder: " + remainder);
 		
 		element.setExtraHexValue(HEXUtils.hexToString(new byte[paddingSize]));
 		return Arrays.copyOfRange(dataBlock.getBlockBytes(), ohdrPrevValue, elementEnd - paddingSize);
+	}
+	
+	private boolean checkIfPaddingZoneContainsSomething(byte[] elementHex, int paddingSize) {
+		for (byte oneByte : Arrays.copyOfRange(elementHex, elementHex.length - paddingSize, elementHex.length)) {
+			if (oneByte != 0x0) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	private void detectElementStruct(byte[] elementHex, int i, SBinDataElement element) {
@@ -893,7 +911,7 @@ public class SBin {
 						struHexStream.write(HEXUtils.shortToBytes((short)fieldId));
 						isFirstFieldPassed = true;
 					}
-					if (nextFieldName.contentEquals(field.getName())) {
+					if (nextFieldName.contentEquals(field.getName()) && struct.getSize() == 0) {
 //						System.out.println("same: " + field.getName());
 						nextFieldName = "";
 						continue;
@@ -1174,6 +1192,12 @@ public class SBin {
 	
 	private byte[] getBytesFromCurPos(byte[] data, int to) {
 		return Arrays.copyOfRange(data, curPos, curPos + to);
+	}
+	
+	public static Checksum getFileBytesChecksum(byte[] data) {
+		Checksum crc = new CRC32();
+        crc.update(data, 0, data.length);
+        return crc;
 	}
 	
 }

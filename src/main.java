@@ -29,7 +29,7 @@ public class main {
 			sbinTools.unpackSBin(args[1], args[2], true);
 			break;
 		case "repack":
-			sbinTools.repackSBin(args[1]);
+			sbinTools.repackSBin(args[1], true);
 			break;
 		case "hash":
 			sbinTools.getFNVHash(args[1]);
