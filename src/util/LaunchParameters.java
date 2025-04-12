@@ -42,8 +42,18 @@ public class LaunchParameters {
 			return SBinType.LAYOUTS;
 		} else if (fileName.contentEquals("playlists.sb")) {
 			return SBinType.PLAYLISTS;
+		} else if (fileName.contentEquals("fonts.sb")) {
+			return SBinType.FONTS;
 		} else if (fileName.contentEquals("tweaks.sb") || fileName.contentEquals("tweaks_ipad.sb")) {
 			return SBinType.TWEAKS;
+		} else if (fileName.contentEquals("nfsmw_android.sb") || fileName.contentEquals("nfs_mw_ios.sb")) {
+			return SBinType.STRING_DATA;
+		} else if (fileName.contentEquals("fake_names.sb")) {
+			return SBinType.FAKE_NAMES;
+		} else if (fileName.contentEquals("regions.sb")) {
+			return SBinType.REGIONS;
+		} else if (fileName.contentEquals("locales.sb")) {
+			return SBinType.LOCALES;
 		} else if (fileName.endsWith(".config")) {
 			return SBinType.CAR_CONFIG;
 		} else if (fileName.endsWith(".sba")) {

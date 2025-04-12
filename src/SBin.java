@@ -525,6 +525,7 @@ public class SBin {
 		if (struBlock.getBlockSizeInt() == 0 || fielBlock.getBlockSizeInt() == 0) {return;}
 		
 		int firstReadableField = 0;
+		boolean allFieldsIsReadable = false;
 		int id = 0;
 		for (byte[] structBytes : struBlock.getBlockElements()) {
 			SBinStruct struct = new SBinStruct();
@@ -537,9 +538,15 @@ public class SBin {
 			if (countToNextStruct == 0) {
 				countToNextStruct = 1;
 			}
-			if (firstReadableField == 0 && firstFieldId > 0) {
-				firstReadableField = firstFieldId; // Read these unknown fields later
-			}
+			
+			if (firstReadableField == 0) {
+				if (firstFieldId > 0 && !allFieldsIsReadable) {
+					firstReadableField = firstFieldId; // Read these unknown fields later
+				} else {
+					allFieldsIsReadable = true; // Happens with Fonts file
+				}
+			} 
+			
 			for (int i = 0; i < countToNextStruct; i++) {
 				struct.addToFields(readField(fielBlock, i, firstFieldId, countToNextStruct));
 			}
@@ -706,7 +713,7 @@ public class SBin {
 		}
 		int structId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 0, 2));
 		if (cancelExceptionsForDATAElements(elementHex, i, structId) ||
-				processHCStructs(elementHex, element, structId)) {
+				processHCStructs(elementHex, element, structId, i)) {
 			return;
 		}
 		
@@ -726,11 +733,11 @@ public class SBin {
 		//System.out.println("structId: " + structId + ", :" + (sbinJson.getStructs().size() > structId));
 	}
 	
-	private boolean processHCStructs(byte[] elementHex, SBinDataElement element, int structId) {
-		if (SBinHCStructs.isExceptionForHCStructs(elementHex, structId)) {
+	private boolean processHCStructs(byte[] elementHex, SBinDataElement element, int structId, int i) {
+		if (SBinHCStructs.isExceptionForHCStructs(elementHex, structId, i)) {
 			return false;
 		}
-		return SBinHCStructs.unpackHCStructs(elementHex, element, structId);
+		return SBinHCStructs.unpackHCStructs(elementHex, element, structId, i);
 	}
 	
 	private void processDataMap(byte[] elementHex, SBinDataElement element, SBinMapType mapType) throws IOException {
@@ -768,7 +775,7 @@ public class SBin {
 			int structSize = arraySize != 0 ? (elementHex.length - SBinMapUtils.HEADERFULL_SIZE) / arraySize : 0;
 			
 			// Hack to deal with StringPairs, padding issue on other cases
-			if (!SBJson.get().getStructs().get(0).getName().contentEquals("StringPair")) {
+			if (!SBinMapUtils.structArrayExceptions()) {
 				fillElementHexValue(element, elementHex);
 				element.setGlobalType(SBinDataGlobalType.UNKNOWN);
 				SBJson.get().setCDATAllStringsFromDATA(false);

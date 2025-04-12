@@ -73,7 +73,10 @@ public class SBinEnumUtils {
 				strValue = getDefaultHEXString(valueHex, dataField);
 			}
 			break;
-		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF: 
+		case CHAR: // Char being stored on DATA block
+			strValue = String.valueOf((char)valueHex[0]);
+			break;
+		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
 			// CHDR usually is 2 bytes long. Symbol CHDR can be up to 4 bytes
 			byte[] firstTwoBytes = Arrays.copyOfRange(valueHex, 0, 2);
 			strValue = SBJson.get().getCDATStrings().get(HEXUtils.twoLEByteArrayToInt(firstTwoBytes)).getString();
@@ -107,6 +110,13 @@ public class SBinEnumUtils {
 			boolValueStream.write((byte)boolInt);
 			boolValueStream.write(new byte[fieldRealSize - 0x1]);
 			value = boolValueStream.toByteArray();
+			break;
+		case CHAR: // Char being stored on DATA block
+			char valueChar = dataField.getValue().charAt(0);
+			ByteArrayOutputStream charValueStream = new ByteArrayOutputStream();
+			charValueStream.write(valueChar);
+			charValueStream.write(new byte[fieldRealSize - 0x1]);
+			value = charValueStream.toByteArray();
 			break;
 		case CHDR_ID_REF: case CHDR_SYMBOL_ID_REF:
 			value = DataUtils.processStringInCDAT(dataField.getValue());

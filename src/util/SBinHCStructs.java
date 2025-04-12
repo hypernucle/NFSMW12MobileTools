@@ -28,7 +28,7 @@ public class SBinHCStructs {
 	//
 	//
 	
-	public static boolean unpackHCStructs(byte[] elementHex, SBinDataElement element, int structId) {
+	public static boolean unpackHCStructs(byte[] elementHex, SBinDataElement element, int structId, int i) {
 		boolean isHCStruct = false;
 		
 		//System.out.println(element.getOrderHexId());
@@ -65,8 +65,14 @@ public class SBinHCStructs {
 				isHCStruct = true;
 			}
 			break;
+		case FONTS: case REGIONS: case LOCALES:
+			if (i == 0 || structId == 0x1) { 
+				unpackPropertiesBaseObj(elementHex, element);
+				isHCStruct = true;
+			}
+ 			break;
 		default: 
-			if (structId == 0x1 && element.getOrderHexId().contentEquals("0000")) {
+			if (structId == 0x1 && i == 0) {
 				unpackPropertiesBaseObj(elementHex, element);
 				isHCStruct = true;
 			}
@@ -78,7 +84,7 @@ public class SBinHCStructs {
 	public static byte[] repackHCStructs(SBinDataElement element) throws IOException {
 		byte[] hcStructBytes = null;
 		switch(SBJson.get().getSBinType()) {
-		case CAR_CONFIG: case HCSTRUCTS_COMMON: case TWEAKS: case LAYOUTS:
+		case CAR_CONFIG: case HCSTRUCTS_COMMON: case TWEAKS: case LAYOUTS: case FONTS:
 			
 			switch(element.getHCStruct().getType()) {
 			case HCS_TYPE_INTMAP:
@@ -104,7 +110,7 @@ public class SBinHCStructs {
 	
 	// Sometimes one Struct Id could be re-used for both SBin & Hardcoded structs in the same file
 	// Values include possible 1/2 byte padding
-	public static boolean isExceptionForHCStructs(byte[] elementHex, int structIdCount) {
+	public static boolean isExceptionForHCStructs(byte[] elementHex, int structIdCount, int i) {
 		boolean notHCStruct = false;
 		switch(SBJson.get().getSBinType()) {
 		case CAR_CONFIG:

@@ -60,7 +60,10 @@ public class SBinMapUtils {
 	}
 	
 	public static boolean checkForArrayRuleField(byte[] elementHex) {
+		if (SBJson.get().getSBinType().equals(SBinType.REGIONS) ||
+				SBJson.get().getSBinType().equals(SBinType.LOCALES)) {return true;}
 		if (!isMapPropertiesValid(elementHex)) {return false;}
+		
 		int structBaseId = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(elementHex, 2, 4));
 		for (SBinField field : SBJson.get().getEmptyFields()) {
 			if (field.getName().contentEquals(STRUCT_ARRAY_RULE) && field.getSpecOrderId() == structBaseId) {
@@ -79,6 +82,14 @@ public class SBinMapUtils {
 			return false; // Object of Struct? Something else?
 		}
 		return true;
+	}
+	
+	public static boolean structArrayExceptions() {
+		SBinType type = SBJson.get().getSBinType();
+		return type.equals(SBinType.STRING_DATA)
+				|| type.equals(SBinType.FAKE_NAMES)
+				|| type.equals(SBinType.REGIONS)
+				|| type.equals(SBinType.LOCALES);
 	}
 	
 	//
