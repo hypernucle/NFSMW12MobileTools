@@ -619,7 +619,6 @@ public class SBin {
 		
 		int ohdrPrevValue = 0;
 		int i = 0;
-		boolean isAllObjectsKnown = true;
 		for (byte[] ohdrPos : ohdrBlock.getBlockElements()) {
 			SBinDataElement element = new SBinDataElement();
 			int elementOHDR = HEXUtils.byteArrayToInt(ohdrPos);
@@ -634,7 +633,7 @@ public class SBin {
 			detectElementStruct(elementHex, i, element);
 			if (element.getGlobalType().equals(SBinDataGlobalType.UNKNOWN)) {
 				fillElementHexValue(element, elementHex);
-				isAllObjectsKnown = false;
+				SBJson.get().setCDATAllStringsFromDATA(false);
 			} else if (!element.getGlobalType().equals(SBinDataGlobalType.HC_STRUCT)) {
 				parseDATAFields(getCleanElementHex(ohdrPrevValue, elementEnd, element, 
 						remainder, elementHex, dataBlock), i, element);
@@ -644,7 +643,6 @@ public class SBin {
 			blockElements.add(elementHex); // For internal use
 			i++;
 		}
-		SBJson.get().setCDATAllStringsFromDATA(isAllObjectsKnown);
 		SBJson.get().setDataElements(sbinDataElements);
 		dataBlock.setBlockElements(blockElements);
 	}
@@ -773,6 +771,7 @@ public class SBin {
 			if (!SBJson.get().getStructs().get(0).getName().contentEquals("StringPair")) {
 				fillElementHexValue(element, elementHex);
 				element.setGlobalType(SBinDataGlobalType.UNKNOWN);
+				SBJson.get().setCDATAllStringsFromDATA(false);
 				return;
 			}
 			List<SBinDataElement> arrayObjects = new ArrayList<>();
@@ -796,9 +795,11 @@ public class SBin {
 	}
 	
 	private boolean cancelExceptionsForDATAElements(byte[] elementHex, int i, int structId) {
-//		if (SBJson.get().getSBinType().equals(SBinType.LAYOUTS)) {
-//			
-//		}
+		if (SBJson.get().getSBinType().equals(SBinType.ROADBLOCK_LEVEL) && structId == 0x14) {
+			return true; // Always empty
+		} else if (SBJson.get().getSBinType().equals(SBinType.SKYDOME) && structId == 0x5) {
+			return true; // Always empty
+		}
 		return false;
 	}
 	

@@ -48,6 +48,10 @@ public class LaunchParameters {
 			return SBinType.CAR_CONFIG;
 		} else if (fileName.endsWith(".sba")) {
 			return SBinType.TEXTURE;
+		} else if (fileName.startsWith("roadblock_")) {
+			return SBinType.ROADBLOCK_LEVEL;
+		} else if (fileName.contains("skydome") && fileName.contains("prefabs.sb")) {
+			return SBinType.SKYDOME;
 		} 
 		return SBinType.COMMON;
 	}

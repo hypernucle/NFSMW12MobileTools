@@ -66,7 +66,7 @@ public class SBinHCStructs {
 			}
 			break;
 		default: 
-			if (structId == 0x1) {
+			if (structId == 0x1 && element.getOrderHexId().contentEquals("0000")) {
 				unpackPropertiesBaseObj(elementHex, element);
 				isHCStruct = true;
 			}
