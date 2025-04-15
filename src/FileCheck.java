@@ -8,7 +8,6 @@ import java.util.stream.Stream;
 import java.util.zip.Checksum;
 
 import util.SBJson;
-import util.SBinType;
 import util.LaunchParameters;
 
 public class FileCheck {
@@ -29,7 +28,7 @@ public class FileCheck {
 			SBJson.initNewSBJson();
 			SBin.setCurPos(0x0);
 			SBJson.get().setSBinType(LaunchParameters.getSBinTypeByFileName(origFile));
-			Checksum origCRC = sbin.unpackSBin(SBinType.COMMON.toString(), origTotalPath, false);
+			Checksum origCRC = sbin.unpackSBin(origTotalPath, false);
 			Checksum newCRC = sbin.repackSBin(origTotalPath, false);
 			
 			boolean check = origCRC.getValue() == newCRC.getValue();

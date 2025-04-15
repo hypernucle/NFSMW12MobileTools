@@ -29,12 +29,6 @@ import util.TextureUtils;
 public class SBin {
 	
 	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
-	//
-	private static final byte[] PLAYLISTS_DATA_DESC_UNK1 = HEXUtils.decodeHexStr("1C0002000D000C000000");
-	private static final byte[] PLAYLISTS_DATA_DESC_UNK2 = HEXUtils.decodeHexStr("04000F00180000000000");
-	private static final byte[] PLAYLISTS_DATA_TRACK_UNK1 = HEXUtils.decodeHexStr("220005000D000C000000");
-	private static final byte[] PLAYLISTS_DATA_TRACK_UNK2 = HEXUtils.decodeHexStr("07000D0016000000");
-	private static final byte[] PLAYLISTS_DATA_TRACK_UNK3 = HEXUtils.decodeHexStr("08000D0020000000");
 	
 	private static int curPos = 0x0;
 	
@@ -46,7 +40,7 @@ public class SBin {
 		SBinMapUtils.initMapTypes();
 	}
 
-	public Checksum unpackSBin(String fileType, String filePath, boolean output) throws IOException, InterruptedException {
+	public Checksum unpackSBin(String filePath, boolean output) throws IOException, InterruptedException {
 		Path sbinFilePath = Paths.get(filePath);
 		byte[] sbinData = Files.readAllBytes(sbinFilePath);
 
@@ -55,20 +49,30 @@ public class SBin {
 			System.out.println("!!! This SBin version is not supported, version 3 required.");
 			return null;
 		}
-		if (SBJson.get().getSBinType() == null) {
-			SBJson.get().setSBinType(SBinType.valueOf(fileType.toUpperCase()));
-		}
+		
 		SBJson.get().setFileName(sbinFilePath.getFileName().toString());
 		SBJson.get().setSBinVersion(sbinVersion);
 		
 		changeCurPos(0x8); // Skip SBin header + version
 
 		// ENUM: Enum objects stored as a DATA block maps
-		SBinBlockObj enumBlock = processSBinBlock(sbinData, SBinBlockType.ENUM, SBinBlockType.STRU);		
+		SBinBlockObj enumBlock;
 		// STRU: object structures of DATA block
-		SBinBlockObj struBlock = processSBinBlock(sbinData, SBinBlockType.STRU, SBinBlockType.FIEL);
+		SBinBlockObj struBlock;
 		// FIEL: info fields for Structs
-		SBinBlockObj fielBlock = processSBinBlock(sbinData, SBinBlockType.FIEL, SBinBlockType.OHDR);	
+		SBinBlockObj fielBlock;
+		if (!SBJson.get().getSBinType().equals(SBinType.SAVES)) {
+			enumBlock = processSBinBlock(sbinData, SBinBlockType.ENUM, SBinBlockType.STRU);		
+			struBlock = processSBinBlock(sbinData, SBinBlockType.STRU, SBinBlockType.FIEL);
+			fielBlock = processSBinBlock(sbinData, SBinBlockType.FIEL, SBinBlockType.OHDR);	
+		} else {
+			System.out.println("### Limited support for Save Files - only string & HEX edits.");
+			SBJson.get().setCDATAllStringsFromDATA(false);
+			struBlock = processSBinBlock(sbinData, SBinBlockType.STRU, SBinBlockType.FIEL);
+			fielBlock = processSBinBlock(sbinData, SBinBlockType.FIEL, SBinBlockType.ENUM);	
+			enumBlock = processSBinBlock(sbinData, SBinBlockType.ENUM, SBinBlockType.OHDR);		
+		}
+		
 		// OHDR: map of DATA block
 		SBinBlockObj ohdrBlock = processSBinBlock(sbinData, SBinBlockType.OHDR, SBinBlockType.DATA);		
 		// DATA: various objects info
@@ -80,7 +84,7 @@ public class SBin {
 				SBJson.get().getSBinType() == SBinType.TEXTURE ? SBinBlockType.BULK : null);
 		prepareCDATStrings(chdrBlock.getBlockElements(), cdatBlock.getBlockBytes());
 		
-		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {
+		if (LaunchParameters.isDATAObjectsUnpackDisabled() || SBJson.get().getSBinType().equals(SBinType.SAVES)) {
 			SBJson.get().setENUMHexStr(HEXUtils.hexToString(enumBlock.getBlockBytes()).toUpperCase());
 			SBJson.get().setSTRUHexStr(HEXUtils.hexToString(struBlock.getBlockBytes()).toUpperCase());
 			SBJson.get().setFIELHexStr(HEXUtils.hexToString(fielBlock.getBlockBytes()).toUpperCase());
@@ -92,9 +96,6 @@ public class SBin {
 		updateEnumRelatedObjects();
 		// Used for separate file editors, not all of .sb files gets proper objects layouts
 		switch(SBJson.get().getSBinType()) {
-		case PLAYLISTS: // TODO Re-write to new HC Structs system
-			unpackPlaylistsData(dataBlock);
-			break;
 		case TEXTURE:
 			// BULK: Image mipmap offsets
 			SBinBlockObj bulkBlock = processSBinBlock(sbinData, SBinBlockType.BULK, SBinBlockType.BARG);
@@ -143,9 +144,15 @@ public class SBin {
 		fileOutputStr.write(SBinBlockType.getBytes(SBinBlockType.SBIN));
 		fileOutputStr.write(HEXUtils.intToByteArrayLE(SBJson.get().getSBinVersion()));
 		
-		fileOutputStr.write(buildSBinBlock(enumBlock));
-		fileOutputStr.write(buildSBinBlock(struBlock));
-		fileOutputStr.write(buildSBinBlock(fielBlock));
+		if (!SBJson.get().getSBinType().equals(SBinType.SAVES)) {
+			fileOutputStr.write(buildSBinBlock(enumBlock));
+			fileOutputStr.write(buildSBinBlock(struBlock));
+			fileOutputStr.write(buildSBinBlock(fielBlock));
+		} else {
+			fileOutputStr.write(buildSBinBlock(struBlock));
+			fileOutputStr.write(buildSBinBlock(fielBlock));
+			fileOutputStr.write(buildSBinBlock(enumBlock));
+		}
 		fileOutputStr.write(buildSBinBlock(ohdrBlock));
 		fileOutputStr.write(buildSBinBlock(dataBlock));
 		fileOutputStr.write(buildSBinBlock(chdrBlock));
@@ -267,7 +274,8 @@ public class SBin {
 		enumStream.write(block.getFnv1Hash());
 		enumStream.write(block.getBlockBytes());
 		int remainder = enumStream.size() % 4;
-		if (!block.isLastBlock() && remainder != 0) {
+		if ( (!block.isLastBlock() || SBJson.get().getSBinType().equals(SBinType.SAVES))
+				&& remainder != 0) {
 			enumStream.write(new byte[4 - remainder]);
 		}
 		return enumStream.toByteArray();
@@ -471,7 +479,8 @@ public class SBin {
 	
 	// Not the best way to update values, but it works
 	private void updateEnumRelatedObjects() {
-		if (LaunchParameters.isDATAObjectsUnpackDisabled()) {return;}
+		if (LaunchParameters.isDATAObjectsUnpackDisabled() 
+				|| SBJson.get().getSBinType().equals(SBinType.SAVES)) {return;}
 		
 		for (SBinDataElement dataElement : SBJson.get().getDataElements()) {
 			if (dataElement.getArrayObjects() != null) {
@@ -615,6 +624,12 @@ public class SBin {
 	}
 	
 	private void parseDATABlock(SBinBlockObj ohdrBlock, SBinBlockObj dataBlock) throws IOException {
+		if (SBJson.get().getSBinType().equals(SBinType.SAVES)) {
+			SBJson.get().setOHDRHexStr(HEXUtils.hexToString(ohdrBlock.getBlockBytes()).toUpperCase());
+			SBJson.get().setDATAHexStr(HEXUtils.hexToString(dataBlock.getBlockBytes()).toUpperCase());
+			return;
+		}
+		
 		ohdrBlock.getBlockElements().remove(0); // First one is always 0x1
 		ohdrBlock.getBlockElements().add(HEXUtils.intToByteArrayLE(dataBlock.getBlockBytes().length * 0x8)); 
 		// Create a fake last one, same as DATA size
@@ -841,46 +856,6 @@ public class SBin {
 		block.setBlockBytes(stringsHexStream.toByteArray());
 	}
 	
-	private void unpackPlaylistsData(SBinBlockObj dataBlock) {
-		List<byte[]> playlistsMap = readDATABlockObjectMap(dataBlock.getBlockElements().get(1), 0x4);
-		List<SBinPlaylistObj> playlistsJson = new ArrayList<>();
-		
-		for (byte[] playlistDescPos : playlistsMap) {
-			int dataIndex = HEXUtils.byteArrayToInt(playlistDescPos);
-			byte[] playlistDescHex = dataBlock.getBlockElements().get(dataIndex);
-			
-			SBinPlaylistObj playlist = new SBinPlaylistObj();
-			playlist.setOhdrDescRemainder(SBJson.get().getDataElements().get(dataIndex).getOHDRPadRemainder());
-			playlist.setName(
-					DataUtils.getCDATStringByShortCHDRId(playlistDescHex, 12, 14));
-			
-			List<byte[]> tracks = readDATABlockObjectMap(
-					dataBlock.getBlockElements().get(dataIndex + 1), 0x4);
-			playlist.setOhdrStruRemainder(SBJson.get().getDataElements().get(dataIndex + 1).getOHDRPadRemainder());
-			for (byte[] trackId : tracks) {
-				int trackIndex = HEXUtils.byteArrayToInt(trackId);
-				byte[] trackHex = dataBlock.getBlockElements().get(trackIndex);
-				SBinPlaylistTrackObj trackObj = new SBinPlaylistTrackObj();
-				
-				trackObj.setOhdrUnkRemainder(SBJson.get().getDataElements().get(trackIndex).getOHDRPadRemainder());
-				trackObj.setFilePath(
-						DataUtils.getCDATStringByShortCHDRId(trackHex, 12, 14));
-				trackObj.setArtist(
-						DataUtils.getCDATStringByShortCHDRId(trackHex, 22, 24));
-				trackObj.setTitle(
-						DataUtils.getCDATStringByShortCHDRId(trackHex, 32, 34));
-				playlist.addToPlaylist(trackObj);
-			}
-			playlistsJson.add(playlist);
-		}
-		SBJson.get().setPlaylistsArray(playlistsJson);
-		
-		SBJson.get().setDataElements(SBJson.get().getDataElements().subList(0, 1));
-		// Keep only structure-related strings in CDAT output. 
-		// This time string ordering is unusual, so we proceed with hard-coded position
-		SBJson.get().setCDATStrings(SBJson.get().getCDATStrings().subList(0, 13));
-	}
-	
 	//
 	// SBin repack functions
 	//
@@ -969,17 +944,21 @@ public class SBin {
 		block.setHeader(SBinBlockType.getBytes(header));
 		
 		ByteArrayOutputStream ohdrHexStream = new ByteArrayOutputStream();
-		ohdrHexStream.write(HEXUtils.intToByteArrayLE(0x1)); // First element in OHDR
-		int ohdrByteLength = 0x0;
-		for (int i = 0; i < dataBlock.getOHDRMapTemplate().size() - 1; i++) {
-			SBinOHDREntry entry = dataBlock.getOHDRMapTemplate().get(i);
-			int entryLength = entry.getValue();
-			// Some of OHDR entries have a small remainder in values, related to 4-byte alignment
-			// Adding it as it is works well, usually
-			ohdrByteLength += entryLength;
-			ohdrHexStream.write(HEXUtils.intToByteArrayLE(ohdrByteLength + entry.getRemainder()));
-		} // Ignore last DATA element - last OHDR entry ends on DATA length
-		block.setBlockBytes(ohdrHexStream.toByteArray());
+		if (SBJson.get().getOHDRHexStr() != null) {
+			block.setBlockBytes(HEXUtils.decodeHexStr(SBJson.get().getOHDRHexStr()));
+		} else {
+			ohdrHexStream.write(HEXUtils.intToByteArrayLE(0x1)); // First element in OHDR
+			int ohdrByteLength = 0x0;
+			for (int i = 0; i < dataBlock.getOHDRMapTemplate().size() - 1; i++) {
+				SBinOHDREntry entry = dataBlock.getOHDRMapTemplate().get(i);
+				int entryLength = entry.getValue();
+				// Some of OHDR entries have a small remainder in values, related to 4-byte alignment
+				// Adding it as it is works well, usually
+				ohdrByteLength += entryLength;
+				ohdrHexStream.write(HEXUtils.intToByteArrayLE(ohdrByteLength + entry.getRemainder()));
+			} // Ignore last DATA element - last OHDR entry ends on DATA length
+			block.setBlockBytes(ohdrHexStream.toByteArray());
+		}
 		
 		setSBinBlockAttributes(block);
 		return block;
@@ -987,18 +966,21 @@ public class SBin {
 	
 	private void createDATABlockBytes(SBinBlockObj block) throws IOException {
 		ByteArrayOutputStream dataHexStream = new ByteArrayOutputStream();
+		if (SBJson.get().getDATAHexStr() != null) {
+			block.setBlockBytes(HEXUtils.decodeHexStr(SBJson.get().getDATAHexStr()));
+			return;
+		}
+		
 		int i = 0;
 		for (SBinDataElement dataEntry : SBJson.get().getDataElements()) {
 			processDATAEntry(dataEntry, dataHexStream, block);
 			checkForInsertEnumStrings(i);
 			i++;
 		}
-		switch(SBJson.get().getSBinType()) {
-		case PLAYLISTS:
-			dataHexStream.write(preparePlaylistsDataForSBinBlock(block));
-			break;
-		default: break;
-		}
+//		switch(SBJson.get().getSBinType()) {
+//		
+//		default: break;
+//		}
 		block.setBlockBytes(dataHexStream.toByteArray());
 	}
 	
@@ -1120,68 +1102,6 @@ public class SBin {
 				dataElementStream.write(fieldValueToBytes(subField, subStruct));
 			}
 		}
-	}
-	
-	private byte[] preparePlaylistsDataForSBinBlock(SBinBlockObj block) throws IOException {
-		ByteArrayOutputStream playlistsDataHexStream = new ByteArrayOutputStream();
-		int orderId = SBJson.get().getDataElements().size();
-		
-		orderId++; // Skip map entry
-		SBinStructureEntryHex playlistsMap = new SBinStructureEntryHex();
-		playlistsMap.setHeader(HEXUtils.intToByteArrayLE(0xF));
-		playlistsMap.setSize(HEXUtils.intToByteArrayLE(SBJson.get().getPlaylistsArray().size()));
-		playlistsMap.setPadding(new byte[0]);
-		
-		ByteArrayOutputStream playlistCollectionHexStream = new ByteArrayOutputStream();
-		List<SBinOHDREntry> ohdrMapTemplate = new ArrayList<>();
-		for (SBinPlaylistObj playlist : SBJson.get().getPlaylistsArray()) {
-			playlistsMap.addToDataIds(HEXUtils.intToByteArrayLE(orderId)); // Add playlist to map
-			orderId++;
-			
-			SBinPlaylistEntryHex playlistHex = new SBinPlaylistEntryHex();
-			playlistHex.setOhdrDescRemainder(playlist.getOhdrDescRemainder());
-			playlistHex.setOhdrStruRemainder(playlist.getOhdrStruRemainder());
-			playlistHex.setHeader(HEXUtils.shortToBytes((short)0x2));
-			playlistHex.setUnkHex1(PLAYLISTS_DATA_DESC_UNK1);
-			playlistHex.setName(DataUtils.processStringInCDAT(playlist.getName()));
-			playlistHex.setUnkHex2(PLAYLISTS_DATA_DESC_UNK2);
-			playlistHex.setOrderId(HEXUtils.shortToBytes((short)orderId));
-			
-			SBinStructureEntryHex tracksMap = new SBinStructureEntryHex();
-			tracksMap.setHeader(HEXUtils.intToByteArrayLE(0xF));
-			tracksMap.setSize(HEXUtils.intToByteArrayLE(playlist.getPlaylist().size()));
-			tracksMap.setPadding(new byte[0]);
-			
-			for (int i = 0; i < playlist.getPlaylist().size(); i++) {
-				tracksMap.addToDataIds(HEXUtils.intToByteArrayLE(orderId + i + 1));
-			} 
-			playlistHex.setTracksMap(tracksMap);
-			orderId++;
-			
-			for (SBinPlaylistTrackObj track : playlist.getPlaylist()) {
-				SBinPlaylistTrackHex trackEntry = new SBinPlaylistTrackHex();
-				trackEntry.setOhdrUnkRemainder(track.getOhdrUnkRemainder());
-				trackEntry.setHeader(HEXUtils.shortToBytes((short)0x3));
-				trackEntry.setUnkHex1(PLAYLISTS_DATA_TRACK_UNK1);
-				trackEntry.setFilePath(DataUtils.processStringInCDAT(track.getFilePath()));
-				trackEntry.setUnkHex2(PLAYLISTS_DATA_TRACK_UNK2);
-				trackEntry.setArtist(DataUtils.processStringInCDAT(track.getArtist()));
-				trackEntry.setUnkHex3(PLAYLISTS_DATA_TRACK_UNK3);
-				trackEntry.setTitle(DataUtils.processStringInCDAT(track.getTitle()));
-				playlistHex.addToPlaylistTracks(trackEntry);
-				orderId++;
-			}
-			
-			playlistCollectionHexStream.write(playlistHex.toByteArray());
-			ohdrMapTemplate.addAll(playlistHex.ohdrMapTemplate());
-		}
-		// Playlists map comes before the Playlists objects
-		playlistsDataHexStream.write(playlistsMap.toByteArray());
-		playlistsDataHexStream.write(playlistCollectionHexStream.toByteArray());
-
-		block.addToOHDRMapTemplate(playlistsMap.getByteSize(), 1);
-		block.getOHDRMapTemplate().addAll(ohdrMapTemplate);
-		return playlistsDataHexStream.toByteArray();
 	}
 	
 	//

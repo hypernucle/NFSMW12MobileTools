@@ -48,8 +48,6 @@ public final class DataClasses {
 		private List<SBinField> emptyFields = new ArrayList<>();
 		@SerializedName("Structs")
 		private List<SBinStruct> structs = new ArrayList<>();
-		@SerializedName("PlaylistsData")
-		private List<SBinPlaylistObj> playlistsArray;
 		@SerializedName("DATA_Elements")
 		private List<SBinDataElement> dataElements;
 		@SerializedName("CDAT_Strings")
@@ -186,13 +184,6 @@ public final class DataClasses {
 		}
 		public void setStructs(List<SBinStruct> structs) {
 			this.structs = structs;
-		}
-		
-		public List<SBinPlaylistObj> getPlaylistsArray() {
-			return playlistsArray;
-		}
-		public void setPlaylistsArray(List<SBinPlaylistObj> playlistsArray) {
-			this.playlistsArray = playlistsArray;
 		}
 		
 		public List<SBinField> getEmptyFields() {
@@ -602,87 +593,6 @@ public final class DataClasses {
 		}
 		public void setFileNames(List<String> fileNames) {
 			this.fileNames = fileNames;
-		}
-	}
-	
-	public static class SBinPlaylistObj {
-		@SerializedName("OHDRDescRemainder")
-		private int ohdrDescRemainder = 0;
-		@SerializedName("OHDRStruRemainder")
-		private int ohdrStruRemainder = 0;
-		@SerializedName("Name")
-		private String name;
-		@SerializedName("Playlist")
-		private List<SBinPlaylistTrackObj> playlist = new ArrayList<>();
-		
-		public int getOhdrDescRemainder() {
-			return ohdrDescRemainder;
-		}
-		public void setOhdrDescRemainder(int ohdrDescRemainder) {
-			this.ohdrDescRemainder = ohdrDescRemainder;
-		}
-		
-		public int getOhdrStruRemainder() {
-			return ohdrStruRemainder;
-		}
-		public void setOhdrStruRemainder(int ohdrStruRemainder) {
-			this.ohdrStruRemainder = ohdrStruRemainder;
-		}
-		
-		public String getName() {
-			return name;
-		}
-		public void setName(String name) {
-			this.name = name;
-		}
-		
-		public List<SBinPlaylistTrackObj> getPlaylist() {
-			return playlist;
-		}
-		public void setPlaylist(List<SBinPlaylistTrackObj> playlist) {
-			this.playlist = playlist;
-		}
-		public void addToPlaylist(SBinPlaylistTrackObj track) {
-			this.playlist.add(track);
-		}
-	}
-	
-	public static class SBinPlaylistTrackObj {
-		@SerializedName("OHDRUnkRemainder")
-		private int ohdrUnkRemainder = 0;
-		@SerializedName("FilePath")
-		private String filePath;
-		@SerializedName("Artist")
-		private String artist;
-		@SerializedName("Title")
-		private String title;
-		
-		public int getOhdrUnkRemainder() {
-			return ohdrUnkRemainder;
-		}
-		public void setOhdrUnkRemainder(int ohdrUnkRemainder) {
-			this.ohdrUnkRemainder = ohdrUnkRemainder;
-		}
-		
-		public String getFilePath() {
-			return filePath;
-		}
-		public void setFilePath(String filePath) {
-			this.filePath = filePath;
-		}
-		
-		public String getArtist() {
-			return artist;
-		}
-		public void setArtist(String artist) {
-			this.artist = artist;
-		}
-		
-		public String getTitle() {
-			return title;
-		}
-		public void setTitle(String title) {
-			this.title = title;
 		}
 	}
 	

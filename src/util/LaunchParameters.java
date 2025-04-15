@@ -12,11 +12,11 @@ public class LaunchParameters {
 	public static void checkLaunchParameters(String[] args) {
 		if (!args[0].contentEquals("unpack")) {return;}
 		
-		SBJson.get().setSBinType(getSBinTypeByFileName(args[2]));
+		SBJson.get().setSBinType(getSBinTypeByFileName(args[1]));
 		
-		if (args.length != 4) {return;}
+		if (args.length != 3) {return;}
 		
-		switch(args[3]) {
+		switch(args[2]) {
 		case DISABLE_DATA_OBJECTS_UNPACK_STR:
 			System.out.println("### Launch Parameter: DATA objects unpacking disabled. \nAll DATA objects will be properly "
 					+ "splitted according by OHDR table, but without any Object parsing. 1-to-1 repacking still should be possible.");
@@ -38,32 +38,36 @@ public class LaunchParameters {
 		if (SBJson.getHCStructFileArray().contains(fileName)) {
 			return SBinType.HCSTRUCTS_COMMON;
 		} 
-		else if (fileName.contentEquals("layouts.sb")) {
+		
+		switch(fileName) {
+		case "layouts.sb":
 			return SBinType.LAYOUTS;
-		} else if (fileName.contentEquals("playlists.sb")) {
-			return SBinType.PLAYLISTS;
-		} else if (fileName.contentEquals("fonts.sb")) {
+		case "fonts.sb":
 			return SBinType.FONTS;
-		} else if (fileName.contentEquals("tweaks.sb") || fileName.contentEquals("tweaks_ipad.sb")) {
+		case "tweaks.sb": case "tweaks_ipad.sb":
 			return SBinType.TWEAKS;
-		} else if (fileName.contentEquals("nfsmw_android.sb") || fileName.contentEquals("nfs_mw_ios.sb")) {
+		case "nfsmw_android.sb": case "nfs_mw_ios.sb":
 			return SBinType.STRING_DATA;
-		} else if (fileName.contentEquals("fake_names.sb")) {
+		case "fake_names.sb":
 			return SBinType.FAKE_NAMES;
-		} else if (fileName.contentEquals("regions.sb")) {
+		case "regions.sb":
 			return SBinType.REGIONS;
-		} else if (fileName.contentEquals("locales.sb")) {
+		case "locales.sb":
 			return SBinType.LOCALES;
-		} else if (fileName.endsWith(".config")) {
-			return SBinType.CAR_CONFIG;
-		} else if (fileName.endsWith(".sba")) {
-			return SBinType.TEXTURE;
-		} else if (fileName.startsWith("roadblock_")) {
-			return SBinType.ROADBLOCK_LEVEL;
-		} else if (fileName.contains("skydome") && fileName.contains("prefabs.sb")) {
-			return SBinType.SKYDOME;
-		} 
-		return SBinType.COMMON;
+		case "nfstr_save.sb":
+			return SBinType.SAVES;
+		default: 
+			if (fileName.endsWith(".config")) {
+				return SBinType.CAR_CONFIG;
+			} else if (fileName.endsWith(".sba")) {
+				return SBinType.TEXTURE;
+			} else if (fileName.startsWith("roadblock_")) {
+				return SBinType.ROADBLOCK_LEVEL;
+			} else if (fileName.contains("skydome") && fileName.contains("prefabs.sb")) {
+				return SBinType.SKYDOME;
+			} 
+			return SBinType.COMMON;
+		}
 	}
 	
 	public static void disableDATAObjectsUnpack() {
@@ -79,4 +83,5 @@ public class LaunchParameters {
 	public static boolean isMipmapUnpackDisabled() {
 		return disableMipmapUnpack;
 	}
+
 }

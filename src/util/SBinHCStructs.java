@@ -46,6 +46,12 @@ public class SBinHCStructs {
 				unpackPropertiesBaseObj(elementHex, element);
 				isHCStruct = true;
 				break;
+			case 0x2:
+				if (elementHex.length > 0x8) {
+					unpackPropertiesBaseObj(elementHex, element);
+					isHCStruct = true;
+				}
+				break;
 			case 0x5:
 				if (checkForIntegerMap(structId, elementHex)) {
 					unpackIntegerMap(elementHex, element);
