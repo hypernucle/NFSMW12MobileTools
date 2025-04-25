@@ -1,6 +1,17 @@
 {
   "Array": [
+    "playlists.sb",
     "debug_options.sb",
-    "map_overworld.sb"
+    "race_tweaks.sb",
+    "car_preview_tweaks.sb",
+    "track_performance_tweaks.sb",
+    "lod_tweaks.sb",
+    "traffic_tweaks.sb",
+    "map_overworld.sb",
+    "pause_controls.sb",
+    "pause.sb",
+    "race.sb",
+    "garage_paint.sb",
+    "garage_select_car.sb"
   ]
 }
