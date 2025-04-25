@@ -3,7 +3,7 @@ package util;
 public enum SBinTextureFormat {
 	// Supported:
 	RGB, RGBA,
-	// Unpackable Only:
+	// Unpack Only:
 	ETC_RGB,
 	// Not Supported:
 	PVRTC_2BPP_RGB,

@@ -3,12 +3,16 @@ package util;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import util.DataClasses.SBinDataField;
 import util.DataClasses.SBinEnum;
 import util.DataClasses.SBinField;
 
 public class SBinEnumUtils {
+	
+	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	
 	//
 	// SBinFieldType
@@ -172,8 +176,8 @@ public class SBinEnumUtils {
 			}
 			i++;
 		}
-		System.out.println("!!! [Enums] Unable to getEnumValueBytes for Enum " 
-				+ dataField.getEnumJsonPreview() + ": default 2 empty bytes is applied instead.");
+		jl.log(Level.WARNING, "Unable to getEnumValueBytes for Enum {0}: "
+				+ "default 2 empty bytes is applied instead.", dataField.getEnumJsonPreview());
 		return new byte[2];
 	}
 }

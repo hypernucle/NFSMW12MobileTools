@@ -4,6 +4,7 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -11,6 +12,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 
@@ -23,6 +26,8 @@ import util.HEXClasses.SBinBlockObj;
 
 public class TextureUtils {
 	private TextureUtils() {}
+	
+	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	
 	private static final String PARAM_WIDTH = "width";
 	private static final String PARAM_HEIGHT = "height";
@@ -40,7 +45,7 @@ public class TextureUtils {
 	private static int imageFormatId = DDSImage.D3DFMT_A8R8G8B8;
 	private static String formatName = "!pls fix!";
 	private static SBinTextureFormat curTexFormat;
-	private static SBinTextureFormat prevTexFormat;
+	private static boolean isETCToRGB = false;
 	
 	public static void extractImage(SBinBlockObj bulkBlock, byte[] bargBlock) throws IOException, InterruptedException {
 		List<SBinDataElement> textures = DataUtils.getAllDataElementsByStructName(PARAM_TEXTURE);
@@ -50,8 +55,8 @@ public class TextureUtils {
 			int height = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_HEIGHT).getValue());
 			
 			if (!checkSBAImageFormat(texParams)) { // All Mipmap objects repeats the image format
-				System.out.println("!!! This Image format is not supported for unpack (" + curTexFormat.toString() + "). "
-						+ "File contents will be unpacked without the Image.");
+				jl.log(Level.WARNING, "This Image format is not supported for unpack ({0}). "
+						+ "File contents will be unpacked without the Image.", curTexFormat.toString());
 				return;
 			}
 			
@@ -65,7 +70,7 @@ public class TextureUtils {
 				int dataId = HEXUtils.strHexToInt(dataMMId);
 				SBinDataElement mmLevel = SBJson.get().getDataElements().get(dataId);
 				if (!mmLevel.getStructName().contentEquals("Image")) {
-					System.out.println("!!! Mipmap level object structure is wrong or broken, DATA Id: " + dataId + ".");
+					jl.log(Level.WARNING, "Mipmap level object structure is wrong or broken, DATA Id: {0}.", dataId);
 				}
 				int mmLevelWidth = Integer.parseInt(DataUtils.getDataFieldByName(mmLevel, PARAM_WIDTH).getValue());
 				int mmLevelHeight = Integer.parseInt(DataUtils.getDataFieldByName(mmLevel, PARAM_HEIGHT).getValue());
@@ -111,16 +116,17 @@ public class TextureUtils {
 			fileName = fileName + FILE_PNG;
 			File pngFile = new File(fileName);
 			ImageIO.write(flipPNGPixelsVertically(ImageIO.read(pngFile)), "png", pngFile); 
-			System.out.println("### ETC1 texture is converted to .png. In order to repack it back for .sba, "
-					+ "please provide .dds with the same name in " + FMT_R8G8B8 + " format.");
+			jl.log(Level.INFO, "ETC1 texture is converted to .png. In order to repack it back for .sba, "
+					+ "please provide .dds with the same name in {0} format.", FMT_R8G8B8);
 		} else {
 			DDSImage image = DDSImage.createFromData(imageFormatId, width, height, mipMaps);
 			fileName = fileName + FILE_DDS;
 			image.write(new File(fileName));
 		}
-		System.out.println(String.format("### Texture unpacked: %s, format: %s, original format: %s, "
-				+ "width: %d, height: %d, mipmaps: %d (original count: %d)", 
-				fileName, formatName, curTexFormat.toString(), width, height, mipMaps.length, mipmapsOriginalCount));
+		jl.log(Level.INFO, "Texture unpacked: {0}, format: {1}, original format: {2}, "
+				+ "width: {3}, height: {4}, mipmaps: {5} (original count: {6})", 
+				new Object[] {fileName, formatName, curTexFormat.toString(), 
+						width, height, mipMaps.length, mipmapsOriginalCount});
 	}
 	
 	public static void repackImage(SBinBlockObj block) throws IOException {
@@ -135,7 +141,7 @@ public class TextureUtils {
 			int height = Integer.parseInt(DataUtils.getDataFieldByName(texParams, PARAM_HEIGHT).getValue());
 			SBinDataElement mmmap = DataUtils.getDataElementFromValueId(texParams, PARAM_MIPMAPS);
 			if (!checkSBAImageFormat(texParams)) { // All Mipmap objects repeats the image format
-				System.out.println("!!! This Image format is not supported for repack (" + curTexFormat.toString() + "). Aborted.");
+				jl.log(Level.SEVERE, "This Image format is not supported for repack ({0}). Aborted.", curTexFormat.toString());
 				return;
 			}
 			String nameAddition = textures.size() > 1 ? "_" + i : "";
@@ -150,11 +156,11 @@ public class TextureUtils {
 				String format = DataUtils.getDataFieldByName(mmLevel, PARAM_FORMAT).getValue();
 				
 				if (!checkImageFormat(format)) {
-					System.out.println("!!! DDS Image format (" + format + ") is not equal with the SBin data - expect broken Output file.");
+					jl.log(Level.WARNING, "DDS Image format ({0}) is not equal with the SBin data - expect broken Output file.", format);
 				}
 				ImageInfo mipmapLevelInfo = image.getAllMipMaps()[curMipmap];
 				if (mmLevelWidth != mipmapLevelInfo.getWidth() || mmLevelHeight != mipmapLevelInfo.getHeight()) {
-					System.out.println("!!! Image width or height is not equal to SBin Mipmap #" + curMipmap + " data - expect broken Output file.");
+					jl.log(Level.WARNING, "Image width or height is not equal to SBin Mipmap #{0} data - expect broken Output file.", curMipmap);
 				}
 				byte[] mipmapBytes = new byte[mipmapLevelInfo.getData().remaining()];
 				mipmapLevelInfo.getData().get(mipmapBytes);
@@ -180,17 +186,23 @@ public class TextureUtils {
 	private static DDSImage loadImageData(String nameAddition, int width, int height, int mmRequiredCount) throws IOException {
 		DDSImage image = null;
 		
-		if (prevTexFormat.equals(SBinTextureFormat.ETC_RGB)) { // PNG from ETC1
+		if (isETCToRGB) { // PNG from ETC1
 			// Instead of converting ETC1 back, we're simply create a new RGB file
 			// It should be compatible for all cases, despite of the big texture file size & device RAM consumption
 			// Also we prevent the further Img compression loss done by converting textures back and forth
 			// TODO However making a proper ETC1 .sba is possible
-			System.out.println("### .sba format is " + prevTexFormat.toString() + ": save in RGB instead, looking for .dds file.");
+			jl.log(Level.INFO, ".sba format is {0}: save in RGB instead, looking for .dds file.", SBinTextureFormat.ETC_RGB);
 		}
-		image = DDSImage.read(new File(SBJson.get().getFileName() + nameAddition + FILE_DDS));
+		String filePathStr = SBJson.get().getFileName() + nameAddition + FILE_DDS;
+		try {
+			image = DDSImage.read(new File(filePathStr));
+		} catch (FileNotFoundException noFile) {
+			jl.log(Level.SEVERE, "File cannot be found ({0}), aborted.", filePathStr);
+			System.exit(0);
+		}
 		setCurrentImageFormat(image.getPixelFormat());
 		if (image.getWidth() != width || image.getHeight() != height) {
-			System.out.println("!!! Image width, height or format is not compatible with the SBin data - expect broken Output file.");
+			jl.log(Level.WARNING, "Image width, height or format is not compatible with the SBin data - expect broken Output file.");
 		}
 		return image;
 	}
@@ -272,13 +284,11 @@ public class TextureUtils {
 		switch(SBinTextureFormat.valueOf(imageFormat)) {
 		case RGB: case ETC_RGB: // ETC_RGB is placed here for repacking reasons
 			setCurrentImageFormat(DDSImage.D3DFMT_R8G8B8);
-			setPrevSBAImageFormat(SBinTextureFormat.RGB);
 			formatName = FMT_R8G8B8;
 			isSupported = true;
 			break;
 		case RGBA: 
 			setCurrentImageFormat(DDSImage.D3DFMT_A8R8G8B8);
-			setPrevSBAImageFormat(SBinTextureFormat.RGBA);
 			formatName = FMT_A8R8G8B8;
 			isSupported = true;
 			break;
@@ -289,9 +299,6 @@ public class TextureUtils {
 	
 	private static void setCurrentImageFormat(int imageFormat) {
 		imageFormatId = imageFormat;
-	}
-	private static void setPrevSBAImageFormat(SBinTextureFormat format) {
-		prevTexFormat = format;
 	}
 	
 	private static boolean checkImageFormat(String dataFormatInfo) {
@@ -323,7 +330,7 @@ public class TextureUtils {
 			}
 		}
 		if (changeImgFormat) {
-			setPrevSBAImageFormat(SBinTextureFormat.ETC_RGB);
+			isETCToRGB = true;
 		}
 	}
 	

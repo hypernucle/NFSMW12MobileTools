@@ -1,7 +1,12 @@
 package util;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class LaunchParameters {
 	private LaunchParameters() {}
+	
+	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	
 	private static final String DISABLE_MIPMAP_UNPACK_STR = "-disableMipmapUnpack";
 	private static boolean disableMipmapUnpack = false;
@@ -18,18 +23,18 @@ public class LaunchParameters {
 		
 		switch(args[2]) {
 		case DISABLE_DATA_OBJECTS_UNPACK_STR:
-			System.out.println("### Launch Parameter: DATA objects unpacking disabled. \nAll DATA objects will be properly "
+			jl.log(Level.INFO, "Launch Parameter: DATA objects unpacking disabled. \nAll DATA objects will be properly"
 					+ "splitted according by OHDR table, but without any Object parsing. 1-to-1 repacking still should be possible.");
 			disableDATAObjectsUnpack();
 			break;
 		case DISABLE_MIPMAP_UNPACK_STR:
-			System.out.println("### Launch Parameter: Mipmaps unpacking disabled. \nNote that the DATA objects "
+			jl.log(Level.INFO, "Launch Parameter: Mipmaps unpacking disabled. \nNote that the DATA objects "
 					+ "could still contain Mipmaps information, so you must generate all Mipmaps manually, "
 					+ "or edit .sba Json accordingly.");
 			disableMipmapUnpack();
 			break;
 		default: 
-			System.out.println("### Wrong Launch Parameter: " + args[3] + ", ignored.");
+			jl.log(Level.INFO, "Wrong Launch Parameter: {0}, ignored.", args[3]);
 			break;
 		}
 	}

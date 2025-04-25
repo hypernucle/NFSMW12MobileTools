@@ -1,8 +1,10 @@
 import java.io.IOException;
 
+import util.LogEntity;
+
 public class main {
 
-	private static final String ABOUT = "\tNFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.15.1"
+	private static final String ABOUT = "\tNFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.15.2"
 			+ "\n\tUsage examples:"
 			+ "\n\t# Basic SBin file repacker (DATA objects where possible + HEX-edits if you know what to do)."
 			+ "\n\t# Applicable & tested for Races, CarDesc, StringData, Pursuit, Achievements, Career (Garage Cars), Car Configs, Model Prefabs, etc. configs:"
@@ -17,6 +19,7 @@ public class main {
 			+ "\n\t\t'-disableMipmapUnpack', '-disableDATAObjectsUnpack'";
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
+		LogEntity.initLogConfig();
 		SBin sbinTools = new SBin();
 		SBin.startup(args);
 		

@@ -31,7 +31,6 @@ public class SBinHCStructs {
 	public static boolean unpackHCStructs(byte[] elementHex, SBinDataElement element, int structId, int i) {
 		boolean isHCStruct = false;
 		
-		//System.out.println(element.getOrderHexId());
 		switch(SBJson.get().getSBinType()) {
 		case CAR_CONFIG: case HCSTRUCTS_COMMON:
 			if (!checkForDataIdMap(structId, elementHex)) { // Regular Map Array?
@@ -172,7 +171,6 @@ public class SBinHCStructs {
 	
 	private static List<SBHCSPropertyEntity> readPropertyList(
 			int headerSize, int elementRealSize, byte[] elementHex) {
-		//System.out.println(HEXUtils.hexToString(elementHex));
 		List<SBHCSPropertyEntity> props = new ArrayList<>();
 		int bytesTaken = headerSize; // First byte is objects counter
 		

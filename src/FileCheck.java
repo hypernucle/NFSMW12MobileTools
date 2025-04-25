@@ -3,14 +3,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.Checksum;
 
 import util.SBJson;
 import util.LaunchParameters;
+import util.LogEntity;
 
 public class FileCheck {
+	
+	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	
 	public static void checkFiles(String folder, SBin sbin) throws IOException, InterruptedException {
 		List<String> checkList = null;
@@ -32,11 +37,11 @@ public class FileCheck {
 			Checksum newCRC = sbin.repackSBin(origTotalPath, false);
 			
 			boolean check = origCRC.getValue() == newCRC.getValue();
-			System.out.println("### FileCheck for " + origFile + " : " + check + ".");
+			jl.log(Level.FINE, "FileCheck for {0}: {1}.", new Object[] {origFile, check});
 			if (!check) {failedCount++;}
 		}
 		if (failedCount != 0) {
-			System.out.println("\n### FileCheck failed with " + failedCount + " files during re-compilation.");
+			jl.log(Level.WARNING, "FileCheck failed with {0} files during re-compilation.", failedCount);
 		}
 	}
 	

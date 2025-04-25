@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -19,6 +21,8 @@ import util.SBinHCStructs.SBinHCStruct;
 import util.json.PolymorphDeserializer;
 
 public class SBJson {
+	
+	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	
 	static Gson gson = new Gson();
 	private static SBinJson sbinJsonEnt;
@@ -60,6 +64,7 @@ public class SBJson {
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		String jsonOut = gson.toJson(SBJson.get());
 		Files.write(Paths.get(SBJson.get().getFileName() + ".json"), jsonOut.getBytes(StandardCharsets.UTF_8));
+		jl.log(Level.INFO, "Unpacked with {0} DATA objects.", SBJson.get().getDataElements().size());
 	}
 	
 	public static void clearJsonOutputStuff() {

@@ -1,11 +1,14 @@
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
 
@@ -16,6 +19,7 @@ import util.DataUtils;
 import util.HEXClasses.*;
 import util.HEXUtils;
 import util.LaunchParameters;
+import util.LogEntity;
 import util.SBJson;
 import util.SBinBlockType;
 import util.SBinDataGlobalType;
@@ -27,6 +31,8 @@ import util.SBinMapUtils.SBinMapType;
 import util.TextureUtils;
 
 public class SBin {
+	
+	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	
 	private static final byte[] SHORTBYTE_EMPTY = new byte[2];
 	
@@ -42,11 +48,17 @@ public class SBin {
 
 	public Checksum unpackSBin(String filePath, boolean output) throws IOException, InterruptedException {
 		Path sbinFilePath = Paths.get(filePath);
-		byte[] sbinData = Files.readAllBytes(sbinFilePath);
+		byte[] sbinData = null;
+		try {
+			sbinData = Files.readAllBytes(sbinFilePath);
+		} catch (NoSuchFileException noFile) {
+			jl.log(Level.SEVERE, "File cannot be found ({0}), aborted.", filePath);
+			return null;
+		}
 
 		int sbinVersion = sbinData[4];
 		if (sbinVersion != 0x03) {
-			System.out.println("!!! This SBin version is not supported, version 3 required.");
+			jl.log(Level.SEVERE, "This SBin version is not supported, version 3 required.");
 			return null;
 		}
 		
@@ -66,7 +78,7 @@ public class SBin {
 			struBlock = processSBinBlock(sbinData, SBinBlockType.STRU, SBinBlockType.FIEL);
 			fielBlock = processSBinBlock(sbinData, SBinBlockType.FIEL, SBinBlockType.OHDR);	
 		} else {
-			System.out.println("### Limited support for Save Files - only string & HEX edits.");
+			jl.log(Level.INFO, "Limited support for Save Files - only string & HEX edits.");
 			SBJson.get().setCDATAllStringsFromDATA(false);
 			struBlock = processSBinBlock(sbinData, SBinBlockType.STRU, SBinBlockType.FIEL);
 			fielBlock = processSBinBlock(sbinData, SBinBlockType.FIEL, SBinBlockType.ENUM);	
@@ -116,7 +128,12 @@ public class SBin {
 
 	public Checksum repackSBin(String filePath, boolean output) throws IOException {
 		if (output) { // Already loaded during FileCheck
-			SBJson.loadSBJson(filePath);
+			try {
+				SBJson.loadSBJson(filePath);
+			} catch (NoSuchFileException noFile) {
+				jl.log(Level.SEVERE, "File cannot be found ({0}), aborted.", filePath);
+				return null;
+			}
 		}
 		if (SBJson.get().getSBinType() == SBinType.TEXTURE) {
 			TextureUtils.checkForImageFormatOperations();
@@ -162,6 +179,7 @@ public class SBin {
 		byte[] fileBytes = fileOutputStr.toByteArray();
 		if (output) {
 			Files.write(Paths.get("new_" + SBJson.get().getFileName()), fileBytes);
+			jl.log(Level.INFO, "Saved successfully as binary file.");
 		}
 		return getFileBytesChecksum(fileBytes);
 	}
@@ -175,8 +193,8 @@ public class SBin {
 		int hexHash = FNV1.hash32(filePart);
 		String output = Integer.toHexString(HEXUtils.hexRev(hexHash)).toUpperCase();
 		String length = Integer.toHexString(HEXUtils.hexRev(filePart.length)).toUpperCase();
-		System.out.println("FNV1 Hash: " + output);
-		System.out.println("Block Length: " + length);
+		jl.log(Level.INFO, "FNV1 Hash: {0}", output);
+		jl.log(Level.INFO, "Block Length: ", length);
 	}
 
 	//
@@ -342,7 +360,6 @@ public class SBin {
 	private void parseDATAFields(byte[] elementHex, int i, SBinDataElement element) throws IOException {
 		switch (element.getGlobalType()) {
 		case MAP:
-			//System.out.println(HEXUtils.hexToString(elementHex));
 			processDataMap(elementHex, element, SBinMapUtils.getMapType(element.getStructName()));
 			break;
 		case STRUCT:
@@ -406,9 +423,6 @@ public class SBin {
 				processDataFieldValue(subField, field, subStructOffset, subDataField, elementHex, element);
 			}
 			subFields.add(subDataField);
-//			if (element.getOrderHexId().contentEquals("0900")) {
-//				System.out.println(struct.getFieldsArray().size() + ", " + subDataField.getType() + ", " + subDataField.getValue());
-//			}
 		}
 		dataField.setSubFields(subFields);
 	}
@@ -448,10 +462,10 @@ public class SBin {
 	
 	private void handleUnknownDATAHex(SBinField field, int fieldRealSize, 
 			SBinDataField dataField, byte[] elementHex, String hexId) {
-		System.out.println("!!! Unsupported DATA object. Output file is not suitable for repack. Info: Hex ID: " + hexId + ", field: " 
-				+ field.getName() + ", type: " + field.getType() + ", startOffset: " + field.getStartOffset() 
-				+ ", fieldRealSize: " + fieldRealSize + ", dynamicSize: " + field.isDynamicSize() + ", hex size: " + elementHex.length
-				+ ", hex: " + HEXUtils.hexToString(elementHex));
+		jl.log(Level.WARNING, "Unsupported DATA object. Output file is not suitable for repack. Info: Hex ID: {0}, field: {1},"
+				+ " type: {2}, startOffset: {3}, fieldRealSize: {4}, dynamicSize: {5}, hex size: {6}, hex: {7}", 
+				new Object[]{ hexId, field.getName(), field.getType(), field.getStartOffset(), 
+						fieldRealSize, field.isDynamicSize(), elementHex.length, HEXUtils.hexToString(elementHex) });
 		dataField.setType(null);
 		dataField.setEnumJsonPreview(null);
 		dataField.setForcedHexValue(true);
@@ -559,7 +573,6 @@ public class SBin {
 			for (int i = 0; i < countToNextStruct; i++) {
 				struct.addToFields(readField(fielBlock, i, firstFieldId, countToNextStruct));
 			}
-			//System.out.println("id: " + struct.getId() + ", name: " + struct.getName() + ", countToNextStruct: " + countToNextStruct + ", size real: " + struct.getFieldsArray().size());
 			struct.getFieldsArray().get(struct.getFieldsArray().size() - 1).setDynamicSize(true);
 			SBJson.get().addStruct(struct);
 			id++;
@@ -651,7 +664,6 @@ public class SBin {
 			int remainder = elementOHDR % 0x8;
 			element.setOHDRPadRemainder(remainder);
 			
-			//System.out.println("hexId: " + element.getOrderHexId());
 			detectElementStruct(elementHex, i, element);
 			if (element.getGlobalType().equals(SBinDataGlobalType.UNKNOWN)) {
 				fillElementHexValue(element, elementHex);
@@ -682,7 +694,6 @@ public class SBin {
 			int lastFieldStartOffset = fields.get(fields.size() - 1).getStartOffset() + 0x2; // 2 bytes of Struct Id
 			partialLastBlockQuestion = partialLastBlockTakenBytes != 0 
 					&& lastFieldStartOffset == (elementHex.length - partialLastBlockTakenBytes);
-			//System.out.println("LastBlockQuestion: " + (lastFieldStartOffset + 2) + ", " + (elementHex.length - partialLastBlockTakenBytes));
 		}
 		else if (element.getGlobalType().equals(SBinDataGlobalType.MAP)) {
 			SBinMapType mapType = SBinMapUtils.getMapType(element.getStructName());
@@ -707,7 +718,6 @@ public class SBin {
 				paddingSize = 0x0; // Hack for last Field in Sub-Struct, if it's placed on the end of Element
 			}
 		}
-		//System.out.println("pad for " + element.getOrderHexId() + ": " + paddingSize + ", partialLastBlockTakenBytes: " + partialLastBlockTakenBytes + ", remainder: " + remainder);
 		
 		element.setExtraHexValue(HEXUtils.hexToString(new byte[paddingSize]));
 		return Arrays.copyOfRange(dataBlock.getBlockBytes(), ohdrPrevValue, elementEnd - paddingSize);
@@ -735,7 +745,6 @@ public class SBin {
 		SBinMapType mapType = SBinMapUtils.getMapType(elementHex);
 		if (mapType != null) {
 			element.setStructName(mapType.getTypeName());
-			//System.out.println("hex: " + HEXUtils.hexToString(elementHex));
 			element.setGlobalType(SBinDataGlobalType.MAP);
 		} 
 		else if (!SBJson.get().getStructs().isEmpty() && SBJson.get().getStructs().size() > structId) {
@@ -745,7 +754,6 @@ public class SBin {
 				element.setGlobalType(SBinDataGlobalType.STRUCT); // Struct from SBin file itself
 			}
 		}
-		//System.out.println("structId: " + structId + ", :" + (sbinJson.getStructs().size() > structId));
 	}
 	
 	private boolean processHCStructs(byte[] elementHex, SBinDataElement element, int structId, int i) {
@@ -816,6 +824,7 @@ public class SBin {
 		}
 	}
 	
+	// Add more here is necessary
 	private boolean cancelExceptionsForDATAElements(byte[] elementHex, int i, int structId) {
 		if (SBJson.get().getSBinType().equals(SBinType.ROADBLOCK_LEVEL) && structId == 0x14) {
 			return true; // Always empty
@@ -831,7 +840,6 @@ public class SBin {
 		for (byte[] chdrEntry : chdrEntries) {
 			int cdatPos = HEXUtils.byteArrayToInt(Arrays.copyOfRange(chdrEntry, 0, 4));
 			int cdatEntrySize = HEXUtils.byteArrayToInt(Arrays.copyOfRange(chdrEntry, 4, 8));
-			//System.out.println("### cdatPos: " + Integer.toHexString(cdatPos) + ", cdatSize: " + Integer.toHexString(cdatEntrySize));
 			
 			SBinCDATEntry cdatEntry = new SBinCDATEntry();
 			cdatEntry.setString(HEXUtils.utf8BytesToString(Arrays.copyOfRange(cdatBytes, cdatPos, cdatPos + cdatEntrySize)));
@@ -895,11 +903,9 @@ public class SBin {
 						isFirstFieldPassed = true;
 					}
 					if (nextFieldName.contentEquals(field.getName()) && struct.getSize() == 0) {
-//						System.out.println("same: " + field.getName());
 						nextFieldName = "";
 						continue;
 					}
-//					System.out.println("added: " + field.getName());
 					fielHexStream.write(DataUtils.processStringInCDAT(field.getName()));
 					fielHexStream.write(HEXUtils.shortToBytes(
 							(short)SBinEnumUtils.getIdByStringName(field.getType())));
@@ -1000,7 +1006,6 @@ public class SBin {
 			ByteArrayOutputStream dataHexStream, SBinBlockObj block) throws IOException {
 		ByteArrayOutputStream dataElementStream = new ByteArrayOutputStream();
 		
-//		System.out.println("test hexId: " + dataEntry.getOrderHexId());
 		switch(dataEntry.getGlobalType()) {
 		case UNKNOWN:
 			// Unknown object or other stuff represented as HEX array
@@ -1023,7 +1028,6 @@ public class SBin {
 		}
 		byte[] dataEntryHex = dataElementStream.toByteArray();
 		dataHexStream.write(dataEntryHex);
-		//System.out.println("id: " + dataEntry.getOrderHexId() + ", length: " + dataEntryHex.length + ", bytes: " + HEXUtils.hexToString(dataEntryHex));
 		block.addToOHDRMapTemplate(dataEntryHex.length, dataEntry.getOHDRPadRemainder());
 	}
 	
@@ -1073,19 +1077,8 @@ public class SBin {
 		else { // Non-HEX value here means that we know it's type
 			ByteArrayOutputStream dataFieldStream = new ByteArrayOutputStream();
 			SBinFieldType valueType = SBinFieldType.valueOf(dataField.getType());
-//			int fieldRealSize = SBinEnumUtils.getFieldStandardSize(valueType); 
-//			for (SBinField field : struct.getFieldsArray()) {
-//				if (field.getName().contentEquals(dataField.getName()) && !field.isDynamicSize()) {
-//					fieldRealSize = field.getFieldSize();
-//					//System.out.println(dataField.getName() + ", fieldRealSize: " + fieldRealSize);
-//				}
-//			}
 			byte[] convertedValue = SBinEnumUtils.convertValueByType(valueType, dataField, dataField.getFieldSize());
 			dataFieldStream.write(convertedValue);
-//			if (convertedValue.length != dataField.getFieldSize()) {
-//				//System.out.println(dataField.getType() + ", " + dataField.getName() + ", add: " + (fieldRealSize - convertedValue.length));
-//				dataFieldStream.write(new byte[dataField.getFieldSize() - convertedValue.length]);
-//			} 
 			return dataFieldStream.toByteArray();
 		}
 	}
@@ -1096,9 +1089,6 @@ public class SBin {
 			if (subField.getSubStruct() != null) {
 				buildSubStructEntry(hexId, subField, dataElementStream);
 			} else {
-//				if (hexId.contentEquals("0900")) {
-//					System.out.println(subField.getType());
-//				}
 				dataElementStream.write(fieldValueToBytes(subField, subStruct));
 			}
 		}
@@ -1110,12 +1100,10 @@ public class SBin {
 	
 	private static void changeCurPos(int addition) {
 		curPos = curPos + addition;
-		//		System.out.println("### curPos: " + Integer.toHexString(curPos));
 	}
 
 	public static void setCurPos(int newPos) {
 		curPos = newPos;
-		//		System.out.println("### curPos: " + Integer.toHexString(curPos));
 	}
 	
 	private byte[] getBytesFromCurPos(byte[] data, int to) {
