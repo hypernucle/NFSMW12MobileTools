@@ -46,6 +46,13 @@ public final class HEXUtils {
 	public static byte[] intToByteArrayLE(int data) {    
 		return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(data).array(); 
 	}
+	public static byte[] intToByteArrayBE(int data) {    
+		return ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(data).array(); 
+	}
+	
+	public static String byteToHexString(byte value) {
+		return Integer.toString(value, 16);
+	}
 
 	public static float bytesToShort(byte[] bytes) {
 		return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getShort();

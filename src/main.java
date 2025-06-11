@@ -4,7 +4,7 @@ import util.LogEntity;
 
 public class main {
 
-	private static final String ABOUT = "\tNFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.15.2"
+	private static final String ABOUT = "\tNFS Most Wanted (2012, mobile) modding tools by Hypercycle, v0.16"
 			+ "\n\tUsage examples:"
 			+ "\n\t# Basic SBin file repacker (DATA objects where possible + HEX-edits if you know what to do)."
 			+ "\n\t# Applicable & tested for Races, CarDesc, StringData, Pursuit, Achievements, Career (Garage Cars), Car Configs, Model Prefabs, etc. configs:"
@@ -21,6 +21,7 @@ public class main {
 	public static void main(String[] args) throws IOException, InterruptedException {
 		LogEntity.initLogConfig();
 		SBin sbinTools = new SBin();
+		M3GTools m3gTools = new M3GTools();
 		SBin.startup(args);
 		
 		if (args.length == 0) {
@@ -39,6 +40,9 @@ public class main {
 			break;
 		case "check":
 			FileCheck.checkFiles(args[1], sbinTools);
+			break;
+		case "map":
+			m3gTools.mapM3G(args[1]);
 			break;
 		default: 
 			displayHelp();
