@@ -429,7 +429,7 @@ public final class HEXClasses {
 	public static class M3GSubObjParameter {
 		private int type;
 		private int size;
-		private byte[] value;
+		private String value;
 		
 		public int getType() {
 			return type;
@@ -451,10 +451,13 @@ public final class HEXClasses {
 			this.size = HEXUtils.byteArrayToInt(size);
 		}
 		
-		public byte[] getValue() {
+		public String getValue() {
 			return value;
 		}
-		public void setValue(byte[] value) {
+		public byte[] getValueBytes() {
+			return HEXUtils.decodeHexStr(value);
+		}
+		public void setValue(String value) {
 			this.value = value;
 		}
 	}
@@ -686,17 +689,18 @@ public final class HEXClasses {
 	public static class M3GObjGroup extends M3GObject {
 		private byte[] animationControllers;
 		private int animationTracks;
-		private List<M3GObjGeneric> animationArray = new ArrayList<>(); // ???
+		private List<Integer> animationArray = new ArrayList<>(); // ???
 		private int parameterCount;
 		private List<M3GSubObjParameter> parameterArray = new ArrayList<>();
 		private int hasComponentTransform; // byte
-		private List<M3GSubObjComponentTransform> componentTransform = new ArrayList<>();
+		private M3GSubObjComponentTransform componentTransform;
 		private int hasGeneralTransform; // byte
+		private byte[] generalTransformBytes;
 		private byte[] unkPart;
 		private int hasUnkFuncPart; // byte
 		// here must be something related to unknown functional part
 		private int childCount;
-		private int childObjIndex;
+		private List<Integer> childObjIndexArray = new ArrayList<>();
 		
 		public byte[] getAnimationControllers() {
 			return animationControllers;
@@ -715,10 +719,13 @@ public final class HEXClasses {
 			this.animationTracks = HEXUtils.byteArrayToInt(animationTracks);
 		}
 		
-		public List<M3GObjGeneric> getAnimationArray() {
+		public void addToAnimationArray(int objId) {
+			this.animationArray.add(objId);
+		}
+		public List<Integer> getAnimationArray() {
 			return animationArray;
 		}
-		public void setAnimationArray(List<M3GObjGeneric> animationArray) {
+		public void setAnimationArray(List<Integer> animationArray) {
 			this.animationArray = animationArray;
 		}
 		
@@ -732,6 +739,9 @@ public final class HEXClasses {
 			this.parameterCount = HEXUtils.byteArrayToInt(parameterCount);
 		}
 		
+		public void addToParameterArray(M3GSubObjParameter obj) {
+			this.parameterArray.add(obj);
+		}
 		public List<M3GSubObjParameter> getParameterArray() {
 			return parameterArray;
 		}
@@ -749,10 +759,10 @@ public final class HEXClasses {
 			this.hasComponentTransform = (int)hasComponentTransform;
 		}
 		
-		public List<M3GSubObjComponentTransform> getComponentTransform() {
+		public M3GSubObjComponentTransform getComponentTransform() {
 			return componentTransform;
 		}
-		public void setComponentTransform(List<M3GSubObjComponentTransform> componentTransform) {
+		public void setComponentTransform(M3GSubObjComponentTransform componentTransform) {
 			this.componentTransform = componentTransform;
 		}
 		
@@ -764,6 +774,13 @@ public final class HEXClasses {
 		}
 		public void setHasGeneralTransform(byte hasGeneralTransform) {
 			this.hasGeneralTransform = (int)hasGeneralTransform;
+		}
+		
+		public byte[] getGeneralTransformBytes() {
+			return generalTransformBytes;
+		}
+		public void setGeneralTransformBytes(byte[] generalTransformBytes) {
+			this.generalTransformBytes = generalTransformBytes;
 		}
 		
 		public byte[] getUnkPart() {
@@ -793,14 +810,14 @@ public final class HEXClasses {
 			this.childCount = HEXUtils.byteArrayToInt(childCount);
 		}
 		
-		public int getChildObjIndex() {
-			return childObjIndex;
+		public void addToChildObjIndexArray(int objId) {
+			this.childObjIndexArray.add(objId);
 		}
-		public byte[] getChildObjIndexBytes() {
-			return HEXUtils.intToByteArrayLE(childObjIndex);
+		public List<Integer> getChildObjIndexArray() {
+			return childObjIndexArray;
 		}
-		public void setChildObjIndex(byte[] childObjIndex) {
-			this.childObjIndex = HEXUtils.byteArrayToInt(childObjIndex);
+		public void setChildObjIndexArray(List<Integer> childObjIndexArray) {
+			this.childObjIndexArray = childObjIndexArray;
 		}
 	}
 	
