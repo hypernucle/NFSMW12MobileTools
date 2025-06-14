@@ -426,10 +426,60 @@ public final class HEXClasses {
 		}
 	}
 	
+	public static class M3GSubObjParameterProperty {
+		private int objLabelOffset; // byte
+		private String objLabel;
+		private int propertyLabelOffset;
+		private String property;
+		
+		public int getObjLabelOffset() {
+			return objLabelOffset;
+		}
+		public byte getObjLabelOffsetByte() {
+			return (byte)objLabelOffset;
+		}
+		public void setObjLabelOffset(byte objLabelOffset) {
+			this.objLabelOffset = (int)objLabelOffset;
+		}
+		
+		public String getObjLabel() {
+			return objLabel;
+		}
+		public byte[] getObjLabelBytes() {
+			return HEXUtils.decodeHexStr(objLabel);
+		}
+		public void setObjLabel(String objLabel) {
+			this.objLabel = objLabel;
+		}
+		
+		public int getPropertyLabelOffset() {
+			return propertyLabelOffset;
+		}
+		public byte[] getPropertyLabelOffsetBytes() {
+			return HEXUtils.intToByteArrayLE(propertyLabelOffset);
+		}
+		public void setPropertyLabelOffset(byte[] propertyLabelOffset) {
+			this.propertyLabelOffset = HEXUtils.byteArrayToInt(propertyLabelOffset);
+		}
+		
+		public String getProperty() {
+			return property;
+		}
+		public byte[] getPropertyBytes() {
+			return HEXUtils.decodeHexStr(property);
+		}
+		public void setProperty(String property) {
+			this.property = property;
+		}
+	}
+	
 	public static class M3GSubObjParameter {
 		private int type;
 		private int size;
-		private String value;
+		private String strValue; // type 0x0
+		private float[] rgbaColorValue = new float[4]; // type 0x259
+		private M3GSubObjParameterProperty propertyObj; // type 0x2
+		private byte[] unkBytes;
 		
 		public int getType() {
 			return type;
@@ -451,14 +501,35 @@ public final class HEXClasses {
 			this.size = HEXUtils.byteArrayToInt(size);
 		}
 		
-		public String getValue() {
-			return value;
+		public String getStrValue() {
+			return strValue;
 		}
-		public byte[] getValueBytes() {
-			return HEXUtils.decodeHexStr(value);
+		public byte[] getStrValueBytes() {
+			return HEXUtils.decodeHexStr(strValue);
 		}
-		public void setValue(String value) {
-			this.value = value;
+		public void setStrValue(String strValue) {
+			this.strValue = strValue;
+		}
+		
+		public float[] getRGBAColorValue() {
+			return rgbaColorValue;
+		}
+		public void setRGBAColorValue(float[] rgbaColorValue) {
+			this.rgbaColorValue = rgbaColorValue;
+		}
+		
+		public M3GSubObjParameterProperty getPropertyObj() {
+			return propertyObj;
+		}
+		public void setPropertyObj(M3GSubObjParameterProperty propertyObj) {
+			this.propertyObj = propertyObj;
+		}
+		
+		public byte[] getUnkBytes() {
+			return unkBytes;
+		}
+		public void setUnkBytes(byte[] unkBytes) {
+			this.unkBytes = unkBytes;
 		}
 	}
 	
@@ -558,11 +629,95 @@ public final class HEXClasses {
 		}
 	}
 	
+	// 0x1
+	public static class M3GObjAnimationTrackSettings extends M3GObject {
+		private byte[] padding = new byte[12];
+		private float value1;
+		private float value2;
+		private byte[] unkPart = new byte[16];
+
+		public byte[] getPadding() {
+			return padding;
+		}
+		public void setPadding(byte[] padding) {
+			this.padding = padding;
+		}
+
+		public float getValue1() {
+			return value1;
+		}
+		public byte[] getValue1Bytes() {
+			return HEXUtils.floatToBytes(value1);
+		}
+		public void setValue1(byte[] value1) {
+			this.value1 = HEXUtils.bytesToFloat(value1);
+		}
+
+		public float getValue2() {
+			return value2;
+		}
+		public byte[] getValue2Bytes() {
+			return HEXUtils.floatToBytes(value2);
+		}
+		public void setValue2(byte[] value2) {
+			this.value2 = HEXUtils.bytesToFloat(value2);
+		}
+
+		public byte[] getUnkPart() {
+			return unkPart;
+		}
+		public void setUnkPart(byte[] unkPart) {
+			this.unkPart = unkPart;
+		}
+	}
+	
+	// 0x2
+	public static class M3GObjAnimationTrack extends M3GObject {
+		private byte[] padding = new byte[12];
+		private int animationBufferObjIndex;
+		private int animationTrackSettingsObjIndex;
+		private byte[] unkPart = new byte[4];
+
+		public byte[] getPadding() {
+			return padding;
+		}
+		public void setPadding(byte[] padding) {
+			this.padding = padding;
+		}
+
+		public int getAnimationBufferObjIndex() {
+			return animationBufferObjIndex;
+		}
+		public byte[] getAnimationBufferObjIndexBytes() {
+			return HEXUtils.intToByteArrayLE(animationBufferObjIndex);
+		}
+		public void setAnimationBufferObjIndex(byte[] animationBufferObjIndex) {
+			this.animationBufferObjIndex = HEXUtils.byteArrayToInt(animationBufferObjIndex);
+		}
+
+		public int getAnimationTrackSettingsObjIndex() {
+			return animationTrackSettingsObjIndex;
+		}
+		public byte[] getAnimationTrackSettingsObjIndexBytes() {
+			return HEXUtils.intToByteArrayLE(animationTrackSettingsObjIndex);
+		}
+		public void setAnimationTrackSettingsObjIndex(byte[] animationTrackSettingsObjIndex) {
+			this.animationTrackSettingsObjIndex = HEXUtils.byteArrayToInt(animationTrackSettingsObjIndex);
+		}
+		
+		public byte[] getUnkPart() {
+			return unkPart;
+		}
+		public void setUnkPart(byte[] unkPart) {
+			this.unkPart = unkPart;
+		}
+	}
+	
 	// 0x3
 	public static class M3GObjAppearance extends M3GObject {
 		private byte[] animationControllers;
 		private int animationTracks;
-		private List<M3GObjGeneric> animationArray = new ArrayList<>(); // ???
+		private List<Integer> animationArray = new ArrayList<>(); // ???
 		private int parameterCount;
 		private List<M3GSubObjParameter> parameterArray = new ArrayList<>();
 		private int layer; // byte
@@ -590,10 +745,13 @@ public final class HEXClasses {
 			this.animationTracks = HEXUtils.byteArrayToInt(animationTracks);
 		}
 		
-		public List<M3GObjGeneric> getAnimationArray() {
+		public void addToAnimationArray(int objId) {
+			this.animationArray.add(objId);
+		}
+		public List<Integer> getAnimationArray() {
 			return animationArray;
 		}
-		public void setAnimationArray(List<M3GObjGeneric> animationArray) {
+		public void setAnimationArray(List<Integer> animationArray) {
 			this.animationArray = animationArray;
 		}
 		
@@ -607,6 +765,9 @@ public final class HEXClasses {
 			this.parameterCount = HEXUtils.byteArrayToInt(parameterCount);
 		}
 		
+		public void addToParameterArray(M3GSubObjParameter obj) {
+			this.parameterArray.add(obj);
+		}
 		public List<M3GSubObjParameter> getParameterArray() {
 			return parameterArray;
 		}
@@ -826,10 +987,12 @@ public final class HEXClasses {
 		private byte[] padding = new byte[8];
 		private int parameterCount;
 		private List<M3GSubObjParameter> parameterArray = new ArrayList<>();
-		private byte unkPostParamByte = 0x63;
-		private byte texFormatType;
+		private byte unkPostParamByte;
+		private int texFormatType; // byte
 		private int texWidth;
 		private int texHeight;
+		private byte[] texMetadataUnkBytes = new byte[4];
+		private int texMetadataSize;
 		private byte[] texMetadata;
 		
 		public void addToParameters(M3GSubObjParameter param) {
@@ -853,6 +1016,9 @@ public final class HEXClasses {
 			this.parameterCount = HEXUtils.byteArrayToInt(parameterCount);
 		}
 		
+		public void addToParameterArray(M3GSubObjParameter obj) {
+			this.parameterArray.add(obj);
+		}
 		public List<M3GSubObjParameter> getParameterArray() {
 			return parameterArray;
 		}
@@ -867,11 +1033,14 @@ public final class HEXClasses {
 			this.unkPostParamByte = unkPostParamByte;
 		}
 		
-		public byte getTexFormatType() {
+		public int getTexFormatType() {
 			return texFormatType;
 		}
+		public byte getTexFormatTypeByte() {
+			return (byte)texFormatType;
+		}
 		public void setTexFormatType(byte texFormatType) {
-			this.texFormatType = texFormatType;
+			this.texFormatType = (int)texFormatType;
 		}
 		
 		public int getTexWidth() {
@@ -894,6 +1063,23 @@ public final class HEXClasses {
 			this.texHeight = HEXUtils.byteArrayToInt(texHeight);
 		}
 		
+		public byte[] getTexMetadataUnkBytes() {
+			return texMetadataUnkBytes;
+		}
+		public void setTexMetadataUnkBytes(byte[] texMetadataUnkBytes) {
+			this.texMetadataUnkBytes = texMetadataUnkBytes;
+		}
+
+		public int getTexMetadataSize() {
+			return texMetadataSize;
+		}
+		public byte[] getTexMetadataSizeBytes() {
+			return HEXUtils.intToByteArrayLE(texMetadataSize);
+		}
+		public void setTexMetadataSize(byte[] texMetadataSize) {
+			this.texMetadataSize = HEXUtils.byteArrayToInt(texMetadataSize);
+		}
+
 		public byte[] getTexMetadata() {
 			return texMetadata;
 		}
@@ -938,7 +1124,7 @@ public final class HEXClasses {
 			return subMeshCount;
 		}
 		public byte[] getSubMeshCountBytes() {
-			return HEXUtils.intToByteArrayLE(vertexBufferObjIndex);
+			return HEXUtils.intToByteArrayLE(subMeshCount);
 		}
 		public void setSubMeshCount(byte[] subMeshCount) {
 			this.subMeshCount = HEXUtils.byteArrayToInt(subMeshCount);
@@ -958,9 +1144,9 @@ public final class HEXClasses {
 	// 0x11
 	public static class M3GObjTextureRef extends M3GObject {
 		private byte[] padding = new byte[12];
-		private byte[] unkPart;
+		private byte[] unkPart = new byte[2];
 		private int image2DObjIndex;
-		private byte[] unkPart2;
+		private byte[] unkPart2 = new byte[8];
 		
 		public byte[] getPadding() {
 			return padding;
@@ -1061,7 +1247,7 @@ public final class HEXClasses {
 	// 0x15
 	public static class M3GObjVertexBuffer extends M3GObject {
 		private byte[] padding = new byte[12];
-		private float colorRGBA;
+		private byte[] colorRGBA;
 		private int positionVertexArrayObjIndex;
 		private float[] positionBias = new float[3];
 		private float positionScale;
@@ -1069,8 +1255,8 @@ public final class HEXClasses {
 		private int colorsObjIndex;
 		private int textureCoordArrayCount;
 		private List<M3GSubObjTextureCoord> textureCoordArray = new ArrayList<>();
-		private byte[] tangents;
-		private byte[] binormals;
+		private int tangentsVertexArrayObjIndex;
+		private int binormalsVertexArrayObjIndex;
 		
 		public byte[] getPadding() {
 			return padding;
@@ -1079,14 +1265,11 @@ public final class HEXClasses {
 			this.padding = padding;
 		}
 		
-		public float getColorRGBA() {
+		public byte[] getColorRGBA() {
 			return colorRGBA;
 		}
-		public byte[] getColorRGBABytes() {
-			return HEXUtils.floatToBytes(colorRGBA);
-		}
 		public void setColorRGBA(byte[] colorRGBA) {
-			this.colorRGBA = HEXUtils.bytesToFloat(colorRGBA);
+			this.colorRGBA = colorRGBA;
 		}
 		
 		public int getPositionVertexArrayObjIndex() {
@@ -1139,13 +1322,16 @@ public final class HEXClasses {
 		public int getTextureCoordArrayCount() {
 			return textureCoordArrayCount;
 		}
-		public byte[] getTextureCoordArrayCounBytes() {
+		public byte[] getTextureCoordArrayCountBytes() {
 			return HEXUtils.intToByteArrayLE(textureCoordArrayCount);
 		}
-		public void setTextureCoordArrayCoun(byte[] textureCoordArrayCount) {
-			this.textureCoordArrayCount = HEXUtils.byteArrayToInt(textureCoordArrayCount);
+		public void setTextureCoordArrayCount(int textureCoordArrayCount) {
+			this.textureCoordArrayCount = textureCoordArrayCount;
 		}
 		
+		public void addToTextureCoordArray(M3GSubObjTextureCoord obj) {
+			this.textureCoordArray.add(obj);
+		}
 		public List<M3GSubObjTextureCoord> getTextureCoordArray() {
 			return textureCoordArray;
 		}
@@ -1153,24 +1339,32 @@ public final class HEXClasses {
 			this.textureCoordArray = textureCoordArray;
 		}
 		
-		public byte[] getTangents() {
-			return tangents;
+		public int getTangentsVertexArrayObjIndex() {
+			return tangentsVertexArrayObjIndex;
 		}
-		public void setTangents(byte[] tangents) {
-			this.tangents = tangents;
+		public byte[] getTangentsVertexArrayObjIndexBytes() {
+			return HEXUtils.intToByteArrayLE(tangentsVertexArrayObjIndex);
+		}
+		public void setTangentsVertexArrayObjIndex(byte[] tangentsVertexArrayObjIndex) {
+			this.tangentsVertexArrayObjIndex = HEXUtils.byteArrayToInt(tangentsVertexArrayObjIndex);
 		}
 		
-		public byte[] getBinormals() {
-			return binormals;
+		public int getBinormalsVertexArrayObjIndex() {
+			return binormalsVertexArrayObjIndex;
 		}
-		public void setBinormals(byte[] binormals) {
-			this.binormals = binormals;
+		public byte[] getBinormalsVertexArrayObjIndexBytes() {
+			return HEXUtils.intToByteArrayLE(binormalsVertexArrayObjIndex);
+		}
+		public void setBinormalsVertexArrayObjIndex(byte[] binormalsVertexArrayObjIndex) {
+			this.binormalsVertexArrayObjIndex = HEXUtils.byteArrayToInt(binormalsVertexArrayObjIndex);
 		}
 	}
 	
 	// 0x64
 	public static class M3GObjSubMesh extends M3GObject {
-		private byte[] padding = new byte[12];
+		private byte[] padding = new byte[8];
+		private int parameterCount;
+		private List<M3GSubObjParameter> parameterArray = new ArrayList<>();
 		private int indexBufferObjIndex;
 		private int appearanceObjIndex;
 		
@@ -1179,6 +1373,26 @@ public final class HEXClasses {
 		}
 		public void setPadding(byte[] padding) {
 			this.padding = padding;
+		}
+		
+		public int getParameterCount() {
+			return parameterCount;
+		}
+		public byte[] getParameterCountBytes() {
+			return HEXUtils.intToByteArrayLE(parameterCount);
+		}
+		public void setParameterCount(byte[] parameterCount) {
+			this.parameterCount = HEXUtils.byteArrayToInt(parameterCount);
+		}
+		
+		public void addToParameterArray(M3GSubObjParameter obj) {
+			this.parameterArray.add(obj);
+		}
+		public List<M3GSubObjParameter> getParameterArray() {
+			return parameterArray;
+		}
+		public void setParameterArray(List<M3GSubObjParameter> parameterArray) {
+			this.parameterArray = parameterArray;
 		}
 		
 		public int getIndexBufferObjIndex() {
