@@ -1,3 +1,4 @@
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -7,8 +8,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.zip.Checksum;
 
 import util.HEXClasses.*;
 import util.HEXUtils;
@@ -25,11 +28,14 @@ public class M3GTools {
 	private static final int IM2M3G_FILESIZESPART_SIZE = 0x9;
 
 	private static int curPos = 0x0;
+	private static int curOrderId = 1; // Header counts too
 	
 	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	private StringBuilder strLog = new StringBuilder();
+	private int increaseIds = 0;
 	
-	public void mapM3G(String filePath) throws IOException {
+	public void mapM3G(String[] args) throws IOException {
+		String filePath = args[1];
 		Path modelFilePath = Paths.get(filePath);
 		byte[] m3gBytes = null;
 		try {
@@ -56,25 +62,42 @@ public class M3GTools {
 		m3g.setFileSize(Arrays.copyOfRange(fileSizes, 0x1, 0x5)); // Including file sizes and excluding header
 		m3g.setUncompressedFileSize(Arrays.copyOfRange(fileSizes, 0x5, IM2M3G_FILESIZESPART_SIZE));
 		changeCurPos(IM2M3G_FILESIZESPART_SIZE);
-		int i = 1; // Header counts too
 		
-		while (m3gBytes.length - getCurPos() != 0x4) { // Ending empty part (or possible checksum)
-			readNextObject(m3gBytes, m3g, i);
-			i++;
+		if (args.length > 3 && args[2].equalsIgnoreCase("increaseIDs")) {
+			jl.log(Level.INFO, "All Object IDs will be increased by selected number.");
+			increaseIds = Integer.parseInt(args[3]);
 		}
 		
-		jl.log(Level.INFO, "Map log has been saved, object count: " + i + ".");
+		while (m3gBytes.length - getCurPos() != 0x4) { // Ending empty part (or possible checksum)
+			readNextObject(m3gBytes, m3g);
+			nextCurOrderId();
+		}
+		m3g.setChecksum(getBytesFromCurPos(m3gBytes, 0x4));
+		
+		jl.log(Level.INFO, "Map log has been saved, object count: " + getCurOrderId() + ".");
 		// TODO better file name
 		Files.write(Paths.get(filePath + ".map.txt"), strLog.toString().getBytes(StandardCharsets.UTF_8));
+		
+		//
+		
+		ByteArrayOutputStream newStream = new ByteArrayOutputStream();
+		newStream.write(m3g.toByteArray());
+		Files.write(Paths.get(filePath + ".new.bin"), m3g.toByteArray());
+		
+		Checksum origCRC = HEXUtils.getFileBytesChecksum(m3gBytes);
+		Checksum newCRC = HEXUtils.getFileBytesChecksum(newStream.toByteArray());
+		String result = String.format("Rebuilded .m3g file have a 1:1 byte match: %s", 
+				origCRC.getValue() == newCRC.getValue());
+		jl.log(Level.INFO, result);
 	}
 	
 	//
 	//
 	//
 	
-	private void readNextObject(byte[] m3gBytes, M3GModel m3g, int i) {
+	private void readNextObject(byte[] m3gBytes, M3GModel m3g) throws IOException {
 		M3GObjGeneric obj = new M3GObjGeneric();
-		int beginAddr = getCurPos();
+		obj.setStartAddr(getCurPos());
 		obj.setType(passByteFromCurPos(m3gBytes));
 		obj.setSize(passBytesFromCurPos(m3gBytes, 0x4));
 		
@@ -86,7 +109,7 @@ public class M3GTools {
 		String objTypeStr = objTypeEnum != null ? objTypeEnum.toString() 
 				: "0x" + HEXUtils.byteToHexString(obj.getTypeByte());
 		strLog.append(String.format("Object #%d type: %s, size: %d (0x%s - 0x%s)%n", 
-				i, objTypeStr, obj.getSize(), HEXUtils.hexToString(HEXUtils.intToByteArrayBE(beginAddr)), 
+				getCurOrderId(), objTypeStr, obj.getSize(), HEXUtils.hexToString(HEXUtils.intToByteArrayBE(obj.getStartAddr())), 
 				HEXUtils.hexToString(HEXUtils.intToByteArrayBE(endAddr)) ));
 		for (String out : objLogCollection) {
 			strLog.append(out);
@@ -101,21 +124,21 @@ public class M3GTools {
 		
 		switch(objTypeEnum) {
 		case ANIMATION_TRACK:
-			return readObjAnimationTrack(m3gBytes, objLogCollection);
+			return readObjAnimationTrack(m3gBytes, objTemp, objLogCollection);
 		case APPEARANCE:
-			return readObjAppearance(m3gBytes, objLogCollection);
+			return readObjAppearance(m3gBytes, objTemp, objLogCollection);
 		case GROUP:
-			return readObjGroup(m3gBytes, objLogCollection);
+			return readObjGroup(m3gBytes, objTemp, objLogCollection);
 		case IMAGE2D:
-			return readObjImage2D(m3gBytes, objLogCollection);
+			return readObjImage2D(m3gBytes, objTemp, objLogCollection);
 		case MESH_CONFIG:
-			return readObjMesh(m3gBytes, objLogCollection);
+			return readObjMesh(m3gBytes, objTemp, objLogCollection);
 		case SUB_MESH:
-			return readObjSubMesh(m3gBytes, objLogCollection);
+			return readObjSubMesh(m3gBytes, objTemp, objLogCollection);
 		case TEXTURE_REF:
-			return readObjTextureRef(m3gBytes, objLogCollection);
+			return readObjTextureRef(m3gBytes, objTemp, objLogCollection);
 		case VERTEX_BUFFER:
-			return readObjVertexBuffer(m3gBytes, objLogCollection);
+			return readObjVertexBuffer(m3gBytes, objTemp, objLogCollection);
 		case HEADER_ELEMENT: case ANIMATION_TRACK_SETTINGS: case COMPOSITING_MODE: 
 		case POLYGON_MODE: case INDEX_BUFFER: case ANIMATION_BUFFER: 
 		case VERTEX_ARRAY: default:
@@ -162,29 +185,47 @@ public class M3GTools {
 		return subParam;
 	}
 	
+	private void copyBasicObjInfo(M3GObject newObj, M3GObjGeneric objTemp) {
+		newObj.setStartAddr(objTemp.getStartAddr());
+		newObj.setType(objTemp.getTypeByte());
+		newObj.setSize(objTemp.getSizeBytes());
+	}
+	
 	//
 	// Object reading classes
 	//
 	
 	// 0x2
-	private M3GObjAnimationTrack readObjAnimationTrack(byte[] m3gBytes, List<String> objLogCollection) {
+	private M3GObjAnimationTrack readObjAnimationTrack(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
 		M3GObjAnimationTrack animationTrackObj = new M3GObjAnimationTrack();
+		copyBasicObjInfo(animationTrackObj, objTemp);
+		
 		changeCurPos(animationTrackObj.getPadding().length);
 		animationTrackObj.setAnimationBufferObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 		animationTrackObj.setAnimationTrackSettingsObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 		animationTrackObj.setUnkPart(passBytesFromCurPos(m3gBytes, 0x4));
-
+		
+		if (increaseIds != 0) {
+			animationTrackObj.setAnimationBufferObjIndexInc(increaseIds);
+			animationTrackObj.setAnimationTrackSettingsObjIndexInc(increaseIds);
+		}
+		
 		getObjAnimationTrackInfo(animationTrackObj, objLogCollection);
 		return animationTrackObj;
 	}
 	
 	// 0x3
-	private M3GObjAppearance readObjAppearance(byte[] m3gBytes, List<String> objLogCollection) {
+	private M3GObjAppearance readObjAppearance(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
 		M3GObjAppearance appearanceObj = new M3GObjAppearance();
+		copyBasicObjInfo(appearanceObj, objTemp);
+		
 		appearanceObj.setAnimationControllers(passBytesFromCurPos(m3gBytes, 0x4));
 		appearanceObj.setAnimationTracks(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < appearanceObj.getAnimationTracks(); i++) {
-			appearanceObj.addToAnimationArray(HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)));
+			appearanceObj.addToAnimationArray(
+					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
 		}
 		appearanceObj.setParameterCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < appearanceObj.getParameterCount(); i++) {
@@ -197,20 +238,32 @@ public class M3GTools {
 		appearanceObj.setMaterialObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 		appearanceObj.setTextureRefCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < appearanceObj.getTextureRefCount(); i++) {
-			appearanceObj.addToTextureRefObjIndexArray(HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)));
+			appearanceObj.addToTextureRefObjIndexArray(
+					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
 		}
 
+		if (increaseIds != 0) {
+			appearanceObj.setCompositingModeObjIndexInc(increaseIds);
+			appearanceObj.setFogObjIndexInc(increaseIds);
+			appearanceObj.setPolygonModeObjIndexInc(increaseIds);
+			appearanceObj.setMaterialObjIndexInc(increaseIds);
+		}
+		
 		getObjAppearanceInfo(appearanceObj, objLogCollection);
 		return appearanceObj;
 	}
 	
 	// 0x9
-	private M3GObjGroup readObjGroup(byte[] m3gBytes, List<String> objLogCollection) {
+	private M3GObjGroup readObjGroup(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
 		M3GObjGroup groupObj = new M3GObjGroup();
+		copyBasicObjInfo(groupObj, objTemp);
+		
 		groupObj.setAnimationControllers(passBytesFromCurPos(m3gBytes, 0x4));
 		groupObj.setAnimationTracks(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < groupObj.getAnimationTracks(); i++) {
-			groupObj.addToAnimationArray(HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)));
+			groupObj.addToAnimationArray(
+					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
 		}
 		groupObj.setParameterCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < groupObj.getParameterCount(); i++) {
@@ -243,7 +296,8 @@ public class M3GTools {
 		groupObj.setHasUnkFuncPart(passByteFromCurPos(m3gBytes)); // TODO
 		groupObj.setChildCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < groupObj.getChildCount(); i++) { 
-			groupObj.addToChildObjIndexArray(HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)));
+			groupObj.addToChildObjIndexArray(
+					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
 		}
 		
 		getObjGroupInfo(groupObj, objLogCollection);
@@ -251,8 +305,11 @@ public class M3GTools {
 	}
 	
 	// 0xA
-	private M3GObjImage2D readObjImage2D(byte[] m3gBytes, List<String> objLogCollection) {
+	private M3GObjImage2D readObjImage2D(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
 		M3GObjImage2D image2DObj = new M3GObjImage2D();
+		copyBasicObjInfo(image2DObj, objTemp);
+		
 		changeCurPos(image2DObj.getPadding().length);
 		image2DObj.setParameterCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < image2DObj.getParameterCount(); i++) {
@@ -272,14 +329,22 @@ public class M3GTools {
 	}
 	
 	// 0xE
-	private M3GObjMeshConfig readObjMesh(byte[] m3gBytes, List<String> objLogCollection) {
+	private M3GObjMeshConfig readObjMesh(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
 		M3GObjMeshConfig meshObj = new M3GObjMeshConfig();
+		copyBasicObjInfo(meshObj, objTemp);
+		
 		changeCurPos(meshObj.getPadding().length);
 		meshObj.setUnkPart(passBytesFromCurPos(m3gBytes, 0xE));
 		meshObj.setVertexBufferObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 		meshObj.setSubMeshCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < meshObj.getSubMeshCount(); i++) {
-			meshObj.addToSubMeshObjIndexArray(HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)));
+			meshObj.addToSubMeshObjIndexArray(
+					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
+		}
+		
+		if (increaseIds != 0) {
+			meshObj.setVertexBufferObjIndexInc(increaseIds);
 		}
 		
 		getObjMeshInfo(meshObj, objLogCollection);
@@ -287,20 +352,70 @@ public class M3GTools {
 	}
 	
 	// 0x11
-	private M3GObjTextureRef readObjTextureRef(byte[] m3gBytes, List<String> objLogCollection) {
+	private M3GObjTextureRef readObjTextureRef(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
 		M3GObjTextureRef textureRefObj = new M3GObjTextureRef();
+		copyBasicObjInfo(textureRefObj, objTemp);
+		
 		changeCurPos(textureRefObj.getPadding().length);
 		textureRefObj.setUnkPart(passBytesFromCurPos(m3gBytes, 0x2));
 		textureRefObj.setImage2DObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 		textureRefObj.setUnkPart2(passBytesFromCurPos(m3gBytes, 0x8));
 
+		if (increaseIds != 0) {
+			textureRefObj.setImage2DObjIndexInc(increaseIds);
+		}
 		getObjTextureRefInfo(textureRefObj, objLogCollection);
 		return textureRefObj;
 	}
 	
+	// 0x14
+	private M3GObjVertexArray readObjVertexArray(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
+		M3GObjVertexArray vertexArrayObj = new M3GObjVertexArray();
+		copyBasicObjInfo(vertexArrayObj, objTemp);
+		
+		changeCurPos(vertexArrayObj.getPadding().length);
+		vertexArrayObj.setComponentSize(passByteFromCurPos(m3gBytes));
+		vertexArrayObj.setComponentCount(passByteFromCurPos(m3gBytes));
+		vertexArrayObj.setEncoding(passByteFromCurPos(m3gBytes));
+		if (vertexArrayObj.getEncoding() != 0x0) {
+			jl.log(Level.SEVERE, "One of Vertex Array contains encoded element, various issues may happen.");
+		}
+		vertexArrayObj.setVertexCount(passBytesFromCurPos(m3gBytes, 0x2));
+		
+		int elementSize = vertexArrayObj.getComponentSize() * vertexArrayObj.getComponentCount();
+		byte[] vertexArrayRaw = passBytesFromCurPos(m3gBytes, elementSize * vertexArrayObj.getVertexCount());
+		List<byte[]> vertexArray = HEXUtils.splitByteArray(vertexArrayRaw, vertexArrayObj.getVertexCount());
+		for (byte[] vertexElement : vertexArray) {
+			switch(vertexArrayObj.getComponentSize()) {
+			case 0x1:
+				if (vertexArrayObj.getComponentCount() == 0x4) { // RGBA
+					vertexArrayObj.addToVertexArray(new float[] {
+							vertexElement[0] / 255, vertexElement[1] / 255,
+							vertexElement[2] / 255, vertexElement[3] / 255
+					});
+				} else {
+					float[] element = new float[vertexArrayObj.getComponentCount()];
+					for (int b = 0; b < element.length; b++) {
+						element[b] = vertexElement[b]; // positionScale[c] + positionBias[c]
+					}
+					vertexArrayObj.addToVertexArray(element);
+				}
+				break;
+			default: break; // TODO
+			}
+		}
+		
+		return vertexArrayObj;
+	}
+	
 	// 0x15
-	private M3GObjVertexBuffer readObjVertexBuffer(byte[] m3gBytes, List<String> objLogCollection) {
+	private M3GObjVertexBuffer readObjVertexBuffer(byte[] m3gBytes,
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
 		M3GObjVertexBuffer vertexBufferObj = new M3GObjVertexBuffer();
+		copyBasicObjInfo(vertexBufferObj, objTemp);
+		
 		changeCurPos(vertexBufferObj.getPadding().length);
 		vertexBufferObj.setColorRGBA(passBytesFromCurPos(m3gBytes, 0x4));
 		vertexBufferObj.setPositionVertexArrayObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
@@ -313,12 +428,13 @@ public class M3GTools {
 		vertexBufferObj.setPositionScale(passBytesFromCurPos(m3gBytes, 0x4));
 		vertexBufferObj.setNormalsVertexArrayObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 		vertexBufferObj.setColorsObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
-		// -1 means 1 here
-		int texCoordArrayCount = 
-				Math.abs(HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)));
-		vertexBufferObj.setTextureCoordArrayCount(texCoordArrayCount);
 		
-		for (int i = 0; i < vertexBufferObj.getTextureCoordArrayCount(); i++) {
+		byte[] texCoordArrayCountBytes = passBytesFromCurPos(m3gBytes, 0x4);
+		// -1 means 1 here
+		int realTexCoordArrayCount = Math.abs(HEXUtils.byteArrayToInt(texCoordArrayCountBytes));
+		vertexBufferObj.setTextureCoordArrayCount(texCoordArrayCountBytes);
+		
+		for (int i = 0; i < realTexCoordArrayCount; i++) {
 			M3GSubObjTextureCoord texCoordObj = new M3GSubObjTextureCoord();
 			texCoordObj.setTextureCoordObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 			texCoordObj.setTextureCoordBias(new float[] {
@@ -328,18 +444,33 @@ public class M3GTools {
 			});
 			texCoordObj.setTextureCoordScale(passBytesFromCurPos(m3gBytes, 0x4));
 			
+			if (increaseIds != 0) {
+				texCoordObj.setTextureCoordObjIndexInc(increaseIds);
+			}
 			vertexBufferObj.addToTextureCoordArray(texCoordObj);
 		}
 		vertexBufferObj.setTangentsVertexArrayObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 		vertexBufferObj.setBinormalsVertexArrayObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 
+		if (increaseIds != 0) {
+			vertexBufferObj.setPositionVertexArrayObjIndexInc(increaseIds);
+			vertexBufferObj.setNormalsVertexArrayObjIndexInc(increaseIds);
+			vertexBufferObj.setColorsObjIndexInc(increaseIds);
+			
+			vertexBufferObj.setTangentsVertexArrayObjIndexInc(increaseIds);
+			vertexBufferObj.setBinormalsVertexArrayObjIndexInc(increaseIds);
+		}
+		
 		getObjVertexBufferInfo(vertexBufferObj, objLogCollection);
 		return vertexBufferObj;
 	}
 	
 	// 0x64
-	private M3GObjSubMesh readObjSubMesh(byte[] m3gBytes, List<String> objLogCollection) {
+	private M3GObjSubMesh readObjSubMesh(byte[] m3gBytes,
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
 		M3GObjSubMesh subMeshObj = new M3GObjSubMesh();
+		copyBasicObjInfo(subMeshObj, objTemp);
+		
 		changeCurPos(subMeshObj.getPadding().length);
 		subMeshObj.setParameterCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < subMeshObj.getParameterCount(); i++) {
@@ -348,6 +479,11 @@ public class M3GTools {
 		subMeshObj.setIndexBufferObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 		subMeshObj.setAppearanceObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
 
+		if (increaseIds != 0) {
+			subMeshObj.setIndexBufferObjIndexInc(increaseIds);
+			subMeshObj.setAppearanceObjIndexInc(increaseIds);
+		}
+		
 		getObjSubMeshInfo(subMeshObj, objLogCollection);
 		return subMeshObj;
 	}
@@ -624,5 +760,12 @@ public class M3GTools {
 		byte value = data[curPos];
 		changeCurPos(0x1);
 		return value;
+	}
+	
+	public static int getCurOrderId() {
+		return curOrderId;
+	}
+	private static void nextCurOrderId() {
+		curOrderId++;
 	}
 }

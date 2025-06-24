@@ -42,7 +42,7 @@ public class main {
 			FileCheck.checkFiles(args[1], sbinTools);
 			break;
 		case "map":
-			m3gTools.mapM3G(args[1]);
+			m3gTools.mapM3G(args);
 			break;
 		default: 
 			displayHelp();

@@ -7,6 +7,8 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
 import util.DataClasses.SBinCDATEntry;
 
@@ -145,5 +147,11 @@ public final class HEXUtils {
 		// >> 8) - 0xcc0000
 		// If output of all the above expression is
 		// OR'ed then it results in 0xddccbbaa
+	}
+	
+	public static Checksum getFileBytesChecksum(byte[] data) {
+		Checksum crc = new CRC32();
+        crc.update(data, 0, data.length);
+        return crc;
 	}
 }

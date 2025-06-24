@@ -121,7 +121,7 @@ public class SBin {
 		if (output) {
 			SBJson.outputSBJson();
 		} else {
-			return getFileBytesChecksum(sbinData);
+			return HEXUtils.getFileBytesChecksum(sbinData);
 		}
 		return null;
 	}
@@ -181,7 +181,7 @@ public class SBin {
 			Files.write(Paths.get("new_" + SBJson.get().getFileName()), fileBytes);
 			jl.log(Level.INFO, "Saved successfully as binary file.");
 		}
-		return getFileBytesChecksum(fileBytes);
+		return HEXUtils.getFileBytesChecksum(fileBytes);
 	}
 
 	public void getFNVHash(String filePath) throws IOException {
@@ -1108,12 +1108,6 @@ public class SBin {
 	
 	private byte[] getBytesFromCurPos(byte[] data, int to) {
 		return Arrays.copyOfRange(data, curPos, curPos + to);
-	}
-	
-	public static Checksum getFileBytesChecksum(byte[] data) {
-		Checksum crc = new CRC32();
-        crc.update(data, 0, data.length);
-        return crc;
 	}
 	
 }
