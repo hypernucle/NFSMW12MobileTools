@@ -33,6 +33,7 @@ public class M3GTools {
 	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	private StringBuilder strLog = new StringBuilder();
 	private int increaseIds = 0;
+	private boolean outputVertexAndIndexes = false;
 	
 	public void mapM3G(String[] args) throws IOException {
 		String filePath = args[1];
@@ -63,9 +64,14 @@ public class M3GTools {
 		m3g.setUncompressedFileSize(Arrays.copyOfRange(fileSizes, 0x5, IM2M3G_FILESIZESPART_SIZE));
 		changeCurPos(IM2M3G_FILESIZESPART_SIZE);
 		
+		// TODO Make it better
 		if (args.length > 3 && args[2].equalsIgnoreCase("increaseIDs")) {
 			jl.log(Level.INFO, "All Object IDs will be increased by selected number.");
 			increaseIds = Integer.parseInt(args[3]);
+		}
+		if (args.length == 3 && args[2].equalsIgnoreCase("outputVertexAndIndexes")) {
+			jl.log(Level.INFO, "All Vertex Array & Index Buffers will be fully saved into the map.");
+			outputVertexAndIndexes = true;
 		}
 		
 		while (m3gBytes.length - getCurPos() != 0x4) { // Ending empty part (or possible checksum)
@@ -137,11 +143,15 @@ public class M3GTools {
 			return readObjSubMesh(m3gBytes, objTemp, objLogCollection);
 		case TEXTURE_REF:
 			return readObjTextureRef(m3gBytes, objTemp, objLogCollection);
+		case VERTEX_ARRAY:
+			return readObjVertexArray(m3gBytes, objTemp, objLogCollection);
 		case VERTEX_BUFFER:
 			return readObjVertexBuffer(m3gBytes, objTemp, objLogCollection);
+		case INDEX_BUFFER:
+			return readObjIndexBuffer(m3gBytes, objTemp, objLogCollection);
 		case HEADER_ELEMENT: case ANIMATION_TRACK_SETTINGS: case COMPOSITING_MODE: 
-		case POLYGON_MODE: case INDEX_BUFFER: case ANIMATION_BUFFER: 
-		case VERTEX_ARRAY: default:
+		case POLYGON_MODE: case ANIMATION_BUFFER: 
+		default:
 			return readGenericObjData(m3gBytes, objTemp);
 		}
 	}
@@ -386,27 +396,45 @@ public class M3GTools {
 		
 		int elementSize = vertexArrayObj.getComponentSize() * vertexArrayObj.getComponentCount();
 		byte[] vertexArrayRaw = passBytesFromCurPos(m3gBytes, elementSize * vertexArrayObj.getVertexCount());
-		List<byte[]> vertexArray = HEXUtils.splitByteArray(vertexArrayRaw, vertexArrayObj.getVertexCount());
+		// reader position passes entire array here
+		List<byte[]> vertexArray = HEXUtils.splitByteArray(vertexArrayRaw, elementSize);
+		System.out.println(vertexArray.size());
 		for (byte[] vertexElement : vertexArray) {
 			switch(vertexArrayObj.getComponentSize()) {
 			case 0x1:
 				if (vertexArrayObj.getComponentCount() == 0x4) { // RGBA
 					vertexArrayObj.addToVertexArray(new float[] {
-							vertexElement[0] / 255, vertexElement[1] / 255,
-							vertexElement[2] / 255, vertexElement[3] / 255
+							vertexElement[0], vertexElement[1], // divide all by 255
+							vertexElement[2], vertexElement[3]
 					});
 				} else {
 					float[] element = new float[vertexArrayObj.getComponentCount()];
-					for (int b = 0; b < element.length; b++) {
-						element[b] = vertexElement[b]; // positionScale[c] + positionBias[c]
+					for (int b = 0; b < vertexArrayObj.getComponentCount(); b++) {
+						element[b] = vertexElement[b]; // * positionScale[c] + positionBias[c]
 					}
 					vertexArrayObj.addToVertexArray(element);
 				}
 				break;
-			default: break; // TODO
+			case 0x2:
+				float[] element = new float[vertexArrayObj.getComponentCount()];
+				for (int b = 0; b < vertexArrayObj.getComponentCount(); b++) {
+					int int16value = HEXUtils.twoLEByteArrayToInt(Arrays.copyOfRange(vertexElement, 0 + (b * 2), 2 + (b * 2)));
+					element[b] = (float)int16value; // * positionScale[c] + positionBias[c]
+				}
+				vertexArrayObj.addToVertexArray(element);
+				break;
+			case 0x4:
+				float[] element2 = new float[vertexArrayObj.getComponentCount()];
+				for (int b = 0; b < vertexArrayObj.getComponentCount(); b++) {
+					element2[b] = HEXUtils.bytesToFloat(Arrays.copyOfRange(vertexElement, 0 + (b * 4), 4 + (b * 4))); // * positionScale[c] + positionBias[c]
+				}
+				vertexArrayObj.addToVertexArray(element2);
+				break;
+			default: break;
 			}
 		}
 		
+		getObjVertexArrayInfo(vertexArrayObj, objLogCollection);
 		return vertexArrayObj;
 	}
 	
@@ -486,6 +514,62 @@ public class M3GTools {
 		
 		getObjSubMeshInfo(subMeshObj, objLogCollection);
 		return subMeshObj;
+	}
+	
+	// 0x65
+	private M3GObjIndexBuffer readObjIndexBuffer(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
+		M3GObjIndexBuffer indexBufferObj = new M3GObjIndexBuffer();
+		copyBasicObjInfo(indexBufferObj, objTemp);
+
+		changeCurPos(indexBufferObj.getPadding().length);
+		indexBufferObj.setEncoding(passByteFromCurPos(m3gBytes));
+		switch(indexBufferObj.getEncoding()) {
+		case 0x0: // Start ID as Integer
+			indexBufferObj.setStartIndex(passBytesFromCurPos(m3gBytes, 0x4));
+			readObjIndexBufferStripId(m3gBytes, indexBufferObj);
+			break; 
+		case 0x1: // Start ID as Byte
+			indexBufferObj.setStartIndexByte(passByteFromCurPos(m3gBytes));
+			readObjIndexBufferStripId(m3gBytes, indexBufferObj);
+			break; 
+		case 0x2: // Start ID as Short
+			indexBufferObj.setStartIndexShort(passBytesFromCurPos(m3gBytes, 0x2));
+			readObjIndexBufferStripId(m3gBytes, indexBufferObj);
+			break; 
+		case 0x80: // Integer
+			indexBufferObj.setIndexCount(passBytesFromCurPos(m3gBytes, 0x4));
+			for (int i = 0; i < indexBufferObj.getIndexCount(); i++) {
+				indexBufferObj.addToIndexArray(HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)));
+			}	
+			break;
+		case 0x81: // Byte
+			indexBufferObj.setIndexCount(passBytesFromCurPos(m3gBytes, 0x4));
+			for (int i = 0; i < indexBufferObj.getIndexCount(); i++) {
+				indexBufferObj.addToIndexArray(Byte.toUnsignedInt(passByteFromCurPos(m3gBytes)));
+			}	
+			break;
+		case 0x82: // Short
+			indexBufferObj.setIndexCount(passBytesFromCurPos(m3gBytes, 0x4));
+			for (int i = 0; i < indexBufferObj.getIndexCount(); i++) {
+				indexBufferObj.addToIndexArray(HEXUtils.twoLEByteArrayToInt(passBytesFromCurPos(m3gBytes, 0x2)));
+			}	
+			break;
+		default:
+			jl.log(Level.SEVERE, "Weird Index Buffer #{0} object type!", indexBufferObj.getEncoding());
+			break;
+		}
+		indexBufferObj.setUnkIntValue(passBytesFromCurPos(m3gBytes, 0x4));
+
+		getObjIndexBufferInfo(indexBufferObj, objLogCollection);
+		return indexBufferObj;
+	}
+	
+	private void readObjIndexBufferStripId(byte[] m3gBytes, M3GObjIndexBuffer indexBufferObj) {
+		indexBufferObj.setStripLengthsCount(passBytesFromCurPos(m3gBytes, 0x4));
+		for (int i = 0; i < indexBufferObj.getStripLengthsCount(); i++) {
+			indexBufferObj.addToIndexArray(HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)));
+		}	
 	}
 	
 	//
@@ -681,6 +765,43 @@ public class M3GTools {
 		    HEXUtils.hexToString(textureRefObj.getUnkPart2())));
 	}
 	
+	// 0x2
+	private void getObjVertexArrayInfo(M3GObjVertexArray vertexArrayObj, List<String> objLogCollection) {
+		if (!outputVertexAndIndexes) {return;}
+		objLogCollection.add(String.format("::: Component Size: %d%n", 
+				vertexArrayObj.getComponentSize()));
+		objLogCollection.add(String.format("::: Component Count: %d%n", 
+				vertexArrayObj.getComponentCount()));
+		objLogCollection.add(String.format("::: Encoding: %d%n", 
+				vertexArrayObj.getEncoding()));
+		objLogCollection.add(String.format("::: Vertex Count: %d%n", 
+				vertexArrayObj.getVertexCount()));
+		
+		int logCounter = 0;
+		for (float[] floatArray : vertexArrayObj.getVertexArray()) {
+			String vertexObj = String.format("::: Vertex #%d [", logCounter);
+			int i = 1;
+			for (float value : floatArray) {
+				vertexObj = vertexObj.concat(getStrVertexArrayFloat(vertexArrayObj, value));
+				if (i < vertexArrayObj.getComponentCount()) {
+					vertexObj = vertexObj.concat(", ");
+				}
+				i++;
+			}
+			vertexObj = String.format("%s]%n", vertexObj);
+			objLogCollection.add(vertexObj);
+			logCounter++;
+		}
+	}
+	
+	private String getStrVertexArrayFloat(M3GObjVertexArray vertexArrayObj, float value) {
+		if (vertexArrayObj.getComponentSize() == 0x1 && 
+				vertexArrayObj.getComponentCount() == 0x4) {
+			return String.valueOf(value / 255);
+		}
+		return String.valueOf(value);
+	}
+	
 	// 0x15
 	private void getObjVertexBufferInfo(M3GObjVertexBuffer vertexBufferObj, List<String> objLogCollection) {
 		objLogCollection.add(String.format("::: Color RGBA: %s%n", 
@@ -730,6 +851,41 @@ public class M3GTools {
 				subMeshObj.getIndexBufferObjIndex() ));
 		objLogCollection.add(String.format("::: Appearance Object Ref. ID: %d%n", 
 				subMeshObj.getAppearanceObjIndex() ));
+	}
+	
+	// 0x65
+	private void getObjIndexBufferInfo(M3GObjIndexBuffer indexBufferObj, List<String> objLogCollection) {
+		if (!outputVertexAndIndexes) {return;}
+		objLogCollection.add(String.format("::: Encoding: %d%n", 
+				indexBufferObj.getEncoding()));
+		
+		switch(indexBufferObj.getEncoding()) {
+		case 0x0: case 0x1: case 0x2:
+			objLogCollection.add(String.format("::: Start Index: %d%n", 
+					indexBufferObj.getStartIndex()));
+			objLogCollection.add(String.format("::: Strip Lengths Count: %d%n", 
+					indexBufferObj.getStripLengthsCount()));
+			break; 
+		case 0x80: case 0x81: case 0x82:
+			objLogCollection.add(String.format("::: Index Count: %d%n", 
+					indexBufferObj.getIndexCount()));
+			break;
+		default: break;
+		}
+		String indexObj = "::: Index Array [";
+		int i = 1;
+		for (int index : indexBufferObj.getIndexArray()) {
+			indexObj = indexObj.concat(String.valueOf(index));		
+			if (i < indexBufferObj.getIndexCount()) {
+				indexObj = indexObj.concat(", ");
+			}
+			i++;
+		}
+		indexObj = String.format("%s]%n", indexObj);
+		objLogCollection.add(indexObj);
+
+		objLogCollection.add(String.format("::: Unknown ending value: %d%n", 
+				indexBufferObj.getUnkIntValue()));
 	}
 	
 	//

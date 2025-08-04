@@ -1482,9 +1482,18 @@ public final class HEXClasses {
 			bytes.write(getEncodingByte());
 			bytes.write(getVertexCountBytes());
 			for (float[] vertexObj : getVertexArray()) {
-				for (float value : vertexObj) {
-					byte[] floatBytes = HEXUtils.floatToBytes(value);
-					bytes.write(floatBytes);
+				for (Float value : vertexObj) {
+					switch(getComponentSize()) {
+					case 0x1:
+						bytes.write(value.byteValue());
+						break;
+					case 0x2:
+						bytes.write(HEXUtils.shortToBytes(value.shortValue()));
+						break;
+					case 0x4: default:
+						bytes.write(HEXUtils.floatToBytes(value));
+						break;
+					}
 				}
 			}
 			return bytes.toByteArray();
@@ -1800,7 +1809,10 @@ public final class HEXClasses {
 		private byte[] padding = new byte[12];
 		private int encoding; // byte
 		private int indexCount;
+		private int startIndex;
+		private int stripLengthsCount;
 		private List<Integer> indexArray = new ArrayList<>();
+		private int unkIntValue;
 		
 		@Override
 		public byte[] toByteArray() throws IOException {
@@ -1810,10 +1822,50 @@ public final class HEXClasses {
 			//
 			bytes.write(this.padding);
 			bytes.write(getEncodingByte());
-			bytes.write(getIndexCountBytes());
-			for (Integer id : getIndexArray()) {
-				bytes.write(HEXUtils.intToByteArrayLE(id));
+			
+			switch(getEncoding()) {
+			case 0x0:
+				bytes.write(getStartIndexBytes());
+				bytes.write(getStripLengthsCountBytes());
+				for (Integer id : getIndexArray()) {
+					bytes.write(HEXUtils.intToByteArrayLE(id));
+				}
+				break;
+			case 0x1:
+				bytes.write(getStartIndex().byteValue());
+				bytes.write(getStripLengthsCountBytes());
+				for (Integer id : getIndexArray()) {
+					bytes.write(HEXUtils.intToByteArrayLE(id));
+				}
+				break;
+			case 0x2:
+				bytes.write(HEXUtils.shortToBytes(getStartIndex()));
+				bytes.write(getStripLengthsCountBytes());
+				for (Integer id : getIndexArray()) {
+					bytes.write(HEXUtils.intToByteArrayLE(id));
+				}
+				break;
+			case 0x80:
+				bytes.write(getIndexCountBytes());
+				for (Integer id : getIndexArray()) {
+					bytes.write(HEXUtils.intToByteArrayLE(id));
+				}
+				break;
+			case 0x81:
+				bytes.write(getIndexCountBytes());
+				for (Integer id : getIndexArray()) {
+					bytes.write(id.byteValue());
+				}
+				break;
+			case 0x82:
+				bytes.write(getIndexCountBytes());
+				for (Integer id : getIndexArray()) {
+					bytes.write(HEXUtils.shortToBytes(id));
+				}
+				break;
 			}
+
+			bytes.write(getUnkIntValueBytes());
 			return bytes.toByteArray();
 		}
 		
@@ -1831,7 +1883,7 @@ public final class HEXClasses {
 			return (byte)encoding;
 		}
 		public void setEncoding(byte encoding) {
-			this.encoding = (int)encoding;
+			this.encoding = Byte.toUnsignedInt(encoding);
 		}
 		
 		public int getIndexCount() {
@@ -1844,6 +1896,32 @@ public final class HEXClasses {
 			this.indexCount = HEXUtils.byteArrayToInt(indexCount);
 		}
 		
+		public Integer getStartIndex() {
+			return startIndex;
+		}
+		public byte[] getStartIndexBytes() {
+			return HEXUtils.intToByteArrayLE(startIndex);
+		}
+		public void setStartIndex(byte[] startIndex) {
+			this.startIndex = HEXUtils.byteArrayToInt(startIndex);
+		}
+		public void setStartIndexByte(byte startIndex) {
+			this.startIndex = Byte.toUnsignedInt(startIndex);
+		}
+		public void setStartIndexShort(byte[] startIndex) {
+			this.startIndex = HEXUtils.twoLEByteArrayToInt(startIndex);
+		}
+		
+		public int getStripLengthsCount() {
+			return stripLengthsCount;
+		}
+		public byte[] getStripLengthsCountBytes() {
+			return HEXUtils.intToByteArrayLE(stripLengthsCount);
+		}
+		public void setStripLengthsCount(byte[] stripLengthsCount) {
+			this.stripLengthsCount = HEXUtils.byteArrayToInt(stripLengthsCount);
+		}
+		
 		public void addToIndexArray(int objId) {
 			this.indexArray.add(objId);
 		}
@@ -1852,6 +1930,16 @@ public final class HEXClasses {
 		}
 		public void setIndexArray(List<Integer> indexArray) {
 			this.indexArray = indexArray;
+		}
+		
+		public int getUnkIntValue() {
+			return unkIntValue;
+		}
+		public byte[] getUnkIntValueBytes() {
+			return HEXUtils.intToByteArrayLE(unkIntValue);
+		}
+		public void setUnkIntValue(byte[] unkIntValue) {
+			this.unkIntValue = HEXUtils.byteArrayToInt(unkIntValue);
 		}
 	}
 }
