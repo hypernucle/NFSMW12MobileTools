@@ -42,7 +42,7 @@ public class SBin {
 	
 	public static void startup(String[] args) throws IOException {
 		SBJson.initNewSBJson();
-		LaunchParameters.checkLaunchParameters(args);
+		LaunchParameters.checkSBinLaunchParameters(args);
 		SBinMapUtils.initMapTypes();
 	}
 

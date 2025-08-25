@@ -8,13 +8,21 @@ public class LaunchParameters {
 	
 	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	
+	// SBin parameters
 	private static final String DISABLE_MIPMAP_UNPACK_STR = "-disableMipmapUnpack";
 	private static boolean disableMipmapUnpack = false;
-	//
+	
 	private static final String DISABLE_DATA_OBJECTS_UNPACK_STR = "-disableDATAObjectsUnpack";
 	private static boolean disableDATAObjectsUnpack = false;
 	
-	public static void checkLaunchParameters(String[] args) {
+	// M3G parameters
+	private static final String OUTPUT_VERTEX_INDEXES_STR = "-outputVertexAndIndexes";
+	private static boolean outputVertexAndIndexes = false;
+	
+	private static final String M3G_READER_CHECK_STR = "-check";
+	private static boolean m3gReaderCheck = false;
+	
+	public static void checkSBinLaunchParameters(String[] args) {
 		if (!args[0].contentEquals("unpack")) {return;}
 		
 		SBJson.get().setSBinType(getSBinTypeByFileName(args[1]));
@@ -75,6 +83,23 @@ public class LaunchParameters {
 		}
 	}
 	
+	//
+	
+	public static void checkM3GLaunchParameters(String[] args) {
+		if (args.length == 3) {
+			if (args[2].equalsIgnoreCase(OUTPUT_VERTEX_INDEXES_STR)) {
+				jl.log(Level.INFO, "All Vertex Array & Index Buffers will be fully saved into the map.");
+				enableOutputVertexAndIndexes();
+			} else if (args[2].equalsIgnoreCase(M3G_READER_CHECK_STR)) {
+				jl.log(Level.INFO, "M3G original & readed file check enabled.");
+				enableM3GReaderCheck();
+			}
+		}
+		
+	}
+	
+	// SBin parameter methods
+	
 	public static void disableDATAObjectsUnpack() {
 		disableDATAObjectsUnpack = true;
 	}
@@ -87,6 +112,22 @@ public class LaunchParameters {
 	}
 	public static boolean isMipmapUnpackDisabled() {
 		return disableMipmapUnpack;
+	}
+	
+	// M3G parameter methods
+	
+	public static void enableOutputVertexAndIndexes() {
+		outputVertexAndIndexes = true;
+	}
+	public static boolean isOutputVertexAndIndexes() {
+		return outputVertexAndIndexes;
+	}
+	
+	public static void enableM3GReaderCheck() {
+		m3gReaderCheck = true;
+	}
+	public static boolean isM3GReaderCheck() {
+		return m3gReaderCheck;
 	}
 
 }

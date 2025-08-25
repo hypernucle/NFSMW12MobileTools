@@ -1,5 +1,6 @@
 import java.io.IOException;
 
+import util.LaunchParameters;
 import util.LogEntity;
 
 public class main {
@@ -22,7 +23,6 @@ public class main {
 		LogEntity.initLogConfig();
 		SBin sbinTools = new SBin();
 		M3GTools m3gTools = new M3GTools();
-		SBin.startup(args);
 		
 		if (args.length == 0) {
 			displayHelp();
@@ -30,19 +30,28 @@ public class main {
 		}
 		switch(args[0]) {
 		case "unpack":
+			SBin.startup(args);
 			sbinTools.unpackSBin(args[1], true);
 			break;
 		case "repack":
+			SBin.startup(args);
 			sbinTools.repackSBin(args[1], true);
 			break;
 		case "hash":
+			SBin.startup(args);
 			sbinTools.getFNVHash(args[1]);
 			break;
 		case "check":
+			SBin.startup(args);
 			FileCheck.checkFiles(args[1], sbinTools);
 			break;
 		case "map":
+			LaunchParameters.checkM3GLaunchParameters(args);
 			m3gTools.mapM3G(args);
+			break;
+		case "rebuild":
+			LaunchParameters.checkM3GLaunchParameters(args);
+			m3gTools.buildFromJson(args[1]);
 			break;
 		default: 
 			displayHelp();

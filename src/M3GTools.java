@@ -7,15 +7,19 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.Checksum;
 
 import util.HEXClasses.*;
 import util.HEXUtils;
+import util.LaunchParameters;
 import util.LogEntity;
+import util.M3GJson;
 import util.M3GObjectType;
 
 // M3G information based on "M3G2FBX" tool by RaduMC
@@ -26,14 +30,15 @@ public class M3GTools {
 	
 	private static final int IM2M3G_HEADER_SIZE = 0xC;
 	private static final int IM2M3G_FILESIZESPART_SIZE = 0x9;
+	private static final UUID emptyUUID = new UUID(0L, 0L);
 
 	private static int curPos = 0x0;
 	private static int curOrderId = 1; // Header counts too
+	private static Map<Integer, UUID> orderMap = new HashMap<>();
+	private static Map<UUID, Integer> revOrderMap = new HashMap<>();
 	
 	private static final Logger jl = Logger.getLogger(LogEntity.class.getSimpleName());
 	private StringBuilder strLog = new StringBuilder();
-	private int increaseIds = 0;
-	private boolean outputVertexAndIndexes = false;
 	
 	public void mapM3G(String[] args) throws IOException {
 		String filePath = args[1];
@@ -64,16 +69,6 @@ public class M3GTools {
 		m3g.setUncompressedFileSize(Arrays.copyOfRange(fileSizes, 0x5, IM2M3G_FILESIZESPART_SIZE));
 		changeCurPos(IM2M3G_FILESIZESPART_SIZE);
 		
-		// TODO Make it better
-		if (args.length > 3 && args[2].equalsIgnoreCase("increaseIDs")) {
-			jl.log(Level.INFO, "All Object IDs will be increased by selected number.");
-			increaseIds = Integer.parseInt(args[3]);
-		}
-		if (args.length == 3 && args[2].equalsIgnoreCase("outputVertexAndIndexes")) {
-			jl.log(Level.INFO, "All Vertex Array & Index Buffers will be fully saved into the map.");
-			outputVertexAndIndexes = true;
-		}
-		
 		while (m3gBytes.length - getCurPos() != 0x4) { // Ending empty part (or possible checksum)
 			readNextObject(m3gBytes, m3g);
 			nextCurOrderId();
@@ -84,8 +79,38 @@ public class M3GTools {
 		// TODO better file name
 		Files.write(Paths.get(filePath + ".map.txt"), strLog.toString().getBytes(StandardCharsets.UTF_8));
 		
-		//
-		
+		M3GJson.outputSBJson(m3g, filePath);
+		if (LaunchParameters.isM3GReaderCheck()) {
+			checkM3GReaderResult(m3g, m3gBytes, filePath);
+		}
+	}
+	
+	public void buildFromJson(String filePath) throws IOException {
+		try {
+			M3GModel m3g = M3GJson.loadM3GJson(filePath);
+			revOrderMap.put(emptyUUID, 0x0); // Null value
+			for (M3GObject obj : m3g.getObjectArray()) {
+				// Save UUID of the object in order
+				revOrderMap.putIfAbsent(obj.getUUID(), getCurOrderId());
+				// Save the actual Integer reference IDs
+				obj.assignUUIDWithOrderIds(revOrderMap);
+				nextCurOrderId();
+			}
+			
+			Files.write(Paths.get(filePath + ".bin"), m3g.toByteArray());
+		} catch (NoSuchFileException noFile) {
+			jl.log(Level.SEVERE, "File cannot be found ({0}), aborted.", filePath);
+		} catch (NullPointerException npe) {
+			jl.log(Level.SEVERE, "One of the object #{0} references defined wrong.", getCurOrderId());
+			//throw new NullPointerException();
+		}
+	}
+	
+	//
+	//
+	//
+	
+	private void checkM3GReaderResult(M3GModel m3g, byte[] m3gBytes, String filePath) throws IOException {
 		ByteArrayOutputStream newStream = new ByteArrayOutputStream();
 		newStream.write(m3g.toByteArray());
 		Files.write(Paths.get(filePath + ".new.bin"), m3g.toByteArray());
@@ -103,9 +128,13 @@ public class M3GTools {
 	
 	private void readNextObject(byte[] m3gBytes, M3GModel m3g) throws IOException {
 		M3GObjGeneric obj = new M3GObjGeneric();
+		obj.setOrderId(getCurOrderId());
 		obj.setStartAddr(getCurPos());
 		obj.setType(passByteFromCurPos(m3gBytes));
 		obj.setSize(passBytesFromCurPos(m3gBytes, 0x4));
+		// Keep the UUID object references instead of direct ID values, for easier edits & re-ordering
+		obj.setUUID(UUID.randomUUID());
+		orderMap.putIfAbsent(obj.getOrderId(), obj.getUUID());
 		
 		List<String> objLogCollection = new ArrayList<>();
 		M3GObjectType objTypeEnum = M3GObjectType.valueOf(obj.getType());
@@ -115,7 +144,8 @@ public class M3GTools {
 		String objTypeStr = objTypeEnum != null ? objTypeEnum.toString() 
 				: "0x" + HEXUtils.byteToHexString(obj.getTypeByte());
 		strLog.append(String.format("Object #%d type: %s, size: %d (0x%s - 0x%s)%n", 
-				getCurOrderId(), objTypeStr, obj.getSize(), HEXUtils.hexToString(HEXUtils.intToByteArrayBE(obj.getStartAddr())), 
+				obj.getOrderId(), objTypeStr, obj.getSize(), 
+				HEXUtils.hexToString(HEXUtils.intToByteArrayBE(obj.getStartAddr())), 
 				HEXUtils.hexToString(HEXUtils.intToByteArrayBE(endAddr)) ));
 		for (String out : objLogCollection) {
 			strLog.append(out);
@@ -135,6 +165,8 @@ public class M3GTools {
 			return readObjAppearance(m3gBytes, objTemp, objLogCollection);
 		case GROUP:
 			return readObjGroup(m3gBytes, objTemp, objLogCollection);
+		case CLONED_GROUP:
+			return readObjClonedGroup(m3gBytes, objTemp, objLogCollection);
 		case IMAGE2D:
 			return readObjImage2D(m3gBytes, objTemp, objLogCollection);
 		case MESH_CONFIG:
@@ -196,9 +228,21 @@ public class M3GTools {
 	}
 	
 	private void copyBasicObjInfo(M3GObject newObj, M3GObjGeneric objTemp) {
+		newObj.setOrderId(objTemp.getOrderId());
 		newObj.setStartAddr(objTemp.getStartAddr());
 		newObj.setType(objTemp.getTypeByte());
 		newObj.setSize(objTemp.getSizeBytes());
+		newObj.setUUID(objTemp.getUUID());
+	}
+	
+	private UUID getOrderReferenceUUID(int id) {
+		UUID refId = orderMap.getOrDefault(id, emptyUUID);
+		if (id != 0x0 && refId.equals(emptyUUID)) {
+			jl.log(Level.SEVERE, "Object reference #{0} cannot be found! "
+					+ "All child objects must be placed before the object in read.", id);
+			throw new NullPointerException();
+		}
+		return refId;
 	}
 	
 	//
@@ -212,14 +256,16 @@ public class M3GTools {
 		copyBasicObjInfo(animationTrackObj, objTemp);
 		
 		changeCurPos(animationTrackObj.getPadding().length);
+		//
 		animationTrackObj.setAnimationBufferObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		animationTrackObj.setAnimationBufferObjUUID(getOrderReferenceUUID(
+				animationTrackObj.getAnimationBufferObjIndex()));
+		//
 		animationTrackObj.setAnimationTrackSettingsObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		animationTrackObj.setAnimationTrackSettingsObjUUID(getOrderReferenceUUID(
+				animationTrackObj.getAnimationTrackSettingsObjIndex()));
+		//
 		animationTrackObj.setUnkPart(passBytesFromCurPos(m3gBytes, 0x4));
-		
-		if (increaseIds != 0) {
-			animationTrackObj.setAnimationBufferObjIndexInc(increaseIds);
-			animationTrackObj.setAnimationTrackSettingsObjIndexInc(increaseIds);
-		}
 		
 		getObjAnimationTrackInfo(animationTrackObj, objLogCollection);
 		return animationTrackObj;
@@ -234,29 +280,37 @@ public class M3GTools {
 		appearanceObj.setAnimationControllers(passBytesFromCurPos(m3gBytes, 0x4));
 		appearanceObj.setAnimationTracks(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < appearanceObj.getAnimationTracks(); i++) {
-			appearanceObj.addToAnimationArray(
-					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
+			int orderId = HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4));
+			appearanceObj.addToAnimationArray(orderId);
+			appearanceObj.addToAnimationArrayObjUUIDArray(getOrderReferenceUUID(orderId));
 		}
 		appearanceObj.setParameterCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < appearanceObj.getParameterCount(); i++) {
 			appearanceObj.addToParameterArray(readSubParameterObject(m3gBytes));
 		}
 		appearanceObj.setLayer(passByteFromCurPos(m3gBytes));
+		//
 		appearanceObj.setCompositingModeObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		appearanceObj.setCompositingModeObjUUID(getOrderReferenceUUID(
+				appearanceObj.getCompositingModeObjIndex()));
+		//
 		appearanceObj.setFogObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		appearanceObj.setFogObjUUID(getOrderReferenceUUID(
+				appearanceObj.getFogObjIndex()));
+		//
 		appearanceObj.setPolygonModeObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		appearanceObj.setPolygonModeObjUUID(getOrderReferenceUUID(
+				appearanceObj.getPolygonModeObjIndex()));
+		//
 		appearanceObj.setMaterialObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		appearanceObj.setMaterialObjUUID(getOrderReferenceUUID(
+				appearanceObj.getMaterialObjIndex()));
+		//
 		appearanceObj.setTextureRefCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < appearanceObj.getTextureRefCount(); i++) {
-			appearanceObj.addToTextureRefObjIndexArray(
-					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
-		}
-
-		if (increaseIds != 0) {
-			appearanceObj.setCompositingModeObjIndexInc(increaseIds);
-			appearanceObj.setFogObjIndexInc(increaseIds);
-			appearanceObj.setPolygonModeObjIndexInc(increaseIds);
-			appearanceObj.setMaterialObjIndexInc(increaseIds);
+			int orderId = HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4));
+			appearanceObj.addToTextureRefObjIndexArray(orderId);
+			appearanceObj.addToTextureRefObjUUIDArray(getOrderReferenceUUID(orderId));
 		}
 		
 		getObjAppearanceInfo(appearanceObj, objLogCollection);
@@ -269,18 +323,33 @@ public class M3GTools {
 		M3GObjGroup groupObj = new M3GObjGroup();
 		copyBasicObjInfo(groupObj, objTemp);
 		
-		groupObj.setAnimationControllers(passBytesFromCurPos(m3gBytes, 0x4));
-		groupObj.setAnimationTracks(passBytesFromCurPos(m3gBytes, 0x4));
-		for (int i = 0; i < groupObj.getAnimationTracks(); i++) {
-			groupObj.addToAnimationArray(
-					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
+		fillObjGroupBase(groupObj, m3gBytes);
+		
+		groupObj.setChildCount(passBytesFromCurPos(m3gBytes, 0x4));
+		for (int i = 0; i < groupObj.getChildCount(); i++) { 
+			int orderId = HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4));
+			groupObj.addToChildObjIndexArray(orderId);
+			groupObj.addToChildObjUUIDArray(getOrderReferenceUUID(orderId));
 		}
-		groupObj.setParameterCount(passBytesFromCurPos(m3gBytes, 0x4));
-		for (int i = 0; i < groupObj.getParameterCount(); i++) {
-			groupObj.addToParameterArray(readSubParameterObject(m3gBytes));
+		
+		getObjGroupInfo(groupObj, objLogCollection);
+		return groupObj;
+	}
+	
+	private void fillObjGroupBase(M3GObjGroupBase groupBaseObj, byte[] m3gBytes) {
+		groupBaseObj.setAnimationControllers(passBytesFromCurPos(m3gBytes, 0x4));
+		groupBaseObj.setAnimationTracks(passBytesFromCurPos(m3gBytes, 0x4));
+		for (int i = 0; i < groupBaseObj.getAnimationTracks(); i++) {
+			int orderId = HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4));
+			groupBaseObj.addToAnimationArray(orderId);
+			groupBaseObj.addToAnimationArrayObjUUIDArray(getOrderReferenceUUID(orderId));
 		}
-		groupObj.setHasComponentTransform(passByteFromCurPos(m3gBytes));
-		if (groupObj.getHasComponentTransform() != 0) {
+		groupBaseObj.setParameterCount(passBytesFromCurPos(m3gBytes, 0x4));
+		for (int i = 0; i < groupBaseObj.getParameterCount(); i++) {
+			groupBaseObj.addToParameterArray(readSubParameterObject(m3gBytes));
+		}
+		groupBaseObj.setHasComponentTransform(passByteFromCurPos(m3gBytes));
+		if (groupBaseObj.getHasComponentTransform() != 0) {
 			M3GSubObjComponentTransform compTrans = new M3GSubObjComponentTransform();
 			compTrans.setTranslation(new float[] {
 					HEXUtils.bytesToFloat(passBytesFromCurPos(m3gBytes, 0x4)),
@@ -296,22 +365,14 @@ public class M3GTools {
 			compTrans.setOrientationAxisX(passBytesFromCurPos(m3gBytes, 0x4));
 			compTrans.setOrientationAxisY(passBytesFromCurPos(m3gBytes, 0x4));
 			compTrans.setOrientationAxisZ(passBytesFromCurPos(m3gBytes, 0x4));
-			groupObj.setComponentTransform(compTrans);
+			groupBaseObj.setComponentTransform(compTrans);
 		}
-		groupObj.setHasGeneralTransform(passByteFromCurPos(m3gBytes)); // TODO
-		if (groupObj.getHasGeneralTransform() != 0) {
-			groupObj.setGeneralTransformBytes(passBytesFromCurPos(m3gBytes, 0x40));
+		groupBaseObj.setHasGeneralTransform(passByteFromCurPos(m3gBytes)); // TODO
+		if (groupBaseObj.getHasGeneralTransform() != 0) {
+			groupBaseObj.setGeneralTransformBytes(passBytesFromCurPos(m3gBytes, 0x40));
 		}
-		groupObj.setUnkPart(passBytesFromCurPos(m3gBytes, 0x7));
-		groupObj.setHasUnkFuncPart(passByteFromCurPos(m3gBytes)); // TODO
-		groupObj.setChildCount(passBytesFromCurPos(m3gBytes, 0x4));
-		for (int i = 0; i < groupObj.getChildCount(); i++) { 
-			groupObj.addToChildObjIndexArray(
-					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
-		}
-		
-		getObjGroupInfo(groupObj, objLogCollection);
-		return groupObj;
+		groupBaseObj.setUnkPart(passBytesFromCurPos(m3gBytes, 0x7));
+		groupBaseObj.setHasUnkFuncPart(passByteFromCurPos(m3gBytes)); // TODO
 	}
 	
 	// 0xA
@@ -346,19 +407,62 @@ public class M3GTools {
 		
 		changeCurPos(meshObj.getPadding().length);
 		meshObj.setUnkPart(passBytesFromCurPos(m3gBytes, 0xE));
+		//
 		meshObj.setVertexBufferObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		meshObj.setVertexBufferObjUUID(getOrderReferenceUUID(
+				meshObj.getVertexBufferObjIndex()));
+		//
 		meshObj.setSubMeshCount(passBytesFromCurPos(m3gBytes, 0x4));
 		for (int i = 0; i < meshObj.getSubMeshCount(); i++) {
-			meshObj.addToSubMeshObjIndexArray(
-					HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4)) + increaseIds);
-		}
-		
-		if (increaseIds != 0) {
-			meshObj.setVertexBufferObjIndexInc(increaseIds);
+			int orderId = HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4));
+			meshObj.addToSubMeshObjIndexArray(orderId);
+			meshObj.addToSubMeshObjUUIDArray(getOrderReferenceUUID(orderId));
 		}
 		
 		getObjMeshInfo(meshObj, objLogCollection);
 		return meshObj;
+	}
+	
+	// 0x10
+	private M3GObjClonedGroup readObjClonedGroup(byte[] m3gBytes, 
+			M3GObjGeneric objTemp, List<String> objLogCollection) {
+		M3GObjClonedGroup clonedGroupObj = new M3GObjClonedGroup();
+		copyBasicObjInfo(clonedGroupObj, objTemp);
+
+		fillObjGroupBase(clonedGroupObj, m3gBytes);
+		
+		clonedGroupObj.setCommonVertexBufferObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		clonedGroupObj.setCommonVertexBufferObjUUID(getOrderReferenceUUID(
+				clonedGroupObj.getCommonVertexBufferObjIndex()));
+		//
+		clonedGroupObj.setObjLODCount(passBytesFromCurPos(m3gBytes, 0x4));
+		for (int i = 0; i < clonedGroupObj.getObjLODCount(); i++) { 
+			int orderId = HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4));
+			clonedGroupObj.addToObjLODIndexArray(orderId);
+			clonedGroupObj.addToObjLODUUIDArray(getOrderReferenceUUID(orderId));
+		}
+		//
+		clonedGroupObj.setGroupObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		clonedGroupObj.setGroupObjUUID(getOrderReferenceUUID(
+				clonedGroupObj.getGroupObjIndex()));
+		//
+		clonedGroupObj.setVertexArray1ObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		clonedGroupObj.setVertexArray1ObjUUID(getOrderReferenceUUID(
+				clonedGroupObj.getVertexArray1ObjIndex()));
+		//
+		clonedGroupObj.setVertexArray2ObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		clonedGroupObj.setVertexArray2ObjUUID(getOrderReferenceUUID(
+				clonedGroupObj.getVertexArray2ObjIndex()));
+		//
+		clonedGroupObj.setMountGroupsObjCount(passBytesFromCurPos(m3gBytes, 0x4));
+		for (int i = 0; i < clonedGroupObj.getMountGroupsObjCount(); i++) { 
+			int orderId = HEXUtils.byteArrayToInt(passBytesFromCurPos(m3gBytes, 0x4));
+			clonedGroupObj.addToMountGroupsObjIndexArray(orderId);
+			clonedGroupObj.addToMountGroupsObjUUIDArray(getOrderReferenceUUID(orderId));
+		}
+		
+		getObjClonedGroupInfo(clonedGroupObj, objLogCollection);
+		return clonedGroupObj;
 	}
 	
 	// 0x11
@@ -369,12 +473,13 @@ public class M3GTools {
 		
 		changeCurPos(textureRefObj.getPadding().length);
 		textureRefObj.setUnkPart(passBytesFromCurPos(m3gBytes, 0x2));
+		//
 		textureRefObj.setImage2DObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		textureRefObj.setImage2DObjUUID(getOrderReferenceUUID(
+				textureRefObj.getImage2DObjIndex()));
+		//
 		textureRefObj.setUnkPart2(passBytesFromCurPos(m3gBytes, 0x8));
 
-		if (increaseIds != 0) {
-			textureRefObj.setImage2DObjIndexInc(increaseIds);
-		}
 		getObjTextureRefInfo(textureRefObj, objLogCollection);
 		return textureRefObj;
 	}
@@ -446,7 +551,11 @@ public class M3GTools {
 		
 		changeCurPos(vertexBufferObj.getPadding().length);
 		vertexBufferObj.setColorRGBA(passBytesFromCurPos(m3gBytes, 0x4));
+		//
 		vertexBufferObj.setPositionVertexArrayObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		vertexBufferObj.setPositionVertexArrayObjUUID(getOrderReferenceUUID(
+				vertexBufferObj.getPositionVertexArrayObjIndex()));
+		//
 		
 		vertexBufferObj.setPositionBias(new float[] {
 			HEXUtils.bytesToFloat(passBytesFromCurPos(m3gBytes, 0x4)),
@@ -454,8 +563,15 @@ public class M3GTools {
 			HEXUtils.bytesToFloat(passBytesFromCurPos(m3gBytes, 0x4))
 		});
 		vertexBufferObj.setPositionScale(passBytesFromCurPos(m3gBytes, 0x4));
+		//
 		vertexBufferObj.setNormalsVertexArrayObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		vertexBufferObj.setNormalsVertexArrayObjUUID(getOrderReferenceUUID(
+				vertexBufferObj.getNormalsVertexArrayObjIndex()));
+		//
 		vertexBufferObj.setColorsObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		vertexBufferObj.setColorsObjUUID(getOrderReferenceUUID(
+				vertexBufferObj.getColorsObjIndex()));
+		//
 		
 		byte[] texCoordArrayCountBytes = passBytesFromCurPos(m3gBytes, 0x4);
 		// -1 means 1 here
@@ -464,7 +580,11 @@ public class M3GTools {
 		
 		for (int i = 0; i < realTexCoordArrayCount; i++) {
 			M3GSubObjTextureCoord texCoordObj = new M3GSubObjTextureCoord();
+			//
 			texCoordObj.setTextureCoordObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+			texCoordObj.setTextureCoordObjUUID(getOrderReferenceUUID(
+					texCoordObj.getTextureCoordObjIndex()));
+			//
 			texCoordObj.setTextureCoordBias(new float[] {
 				HEXUtils.bytesToFloat(passBytesFromCurPos(m3gBytes, 0x4)),
 				HEXUtils.bytesToFloat(passBytesFromCurPos(m3gBytes, 0x4)), // M3G2FBX: 1 - coordBias[1]
@@ -472,22 +592,16 @@ public class M3GTools {
 			});
 			texCoordObj.setTextureCoordScale(passBytesFromCurPos(m3gBytes, 0x4));
 			
-			if (increaseIds != 0) {
-				texCoordObj.setTextureCoordObjIndexInc(increaseIds);
-			}
 			vertexBufferObj.addToTextureCoordArray(texCoordObj);
 		}
 		vertexBufferObj.setTangentsVertexArrayObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		vertexBufferObj.setTangentsVertexArrayObjUUID(getOrderReferenceUUID(
+				vertexBufferObj.getTangentsVertexArrayObjIndex()));
+		//
 		vertexBufferObj.setBinormalsVertexArrayObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
-
-		if (increaseIds != 0) {
-			vertexBufferObj.setPositionVertexArrayObjIndexInc(increaseIds);
-			vertexBufferObj.setNormalsVertexArrayObjIndexInc(increaseIds);
-			vertexBufferObj.setColorsObjIndexInc(increaseIds);
-			
-			vertexBufferObj.setTangentsVertexArrayObjIndexInc(increaseIds);
-			vertexBufferObj.setBinormalsVertexArrayObjIndexInc(increaseIds);
-		}
+		vertexBufferObj.setBinormalsVertexArrayObjUUID(getOrderReferenceUUID(
+				vertexBufferObj.getBinormalsVertexArrayObjIndex()));
+		//
 		
 		getObjVertexBufferInfo(vertexBufferObj, objLogCollection);
 		return vertexBufferObj;
@@ -505,12 +619,13 @@ public class M3GTools {
 			subMeshObj.addToParameterArray(readSubParameterObject(m3gBytes));
 		}
 		subMeshObj.setIndexBufferObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
+		subMeshObj.setIndexBufferObjUUID(getOrderReferenceUUID(
+				subMeshObj.getIndexBufferObjIndex()));
+		//
 		subMeshObj.setAppearanceObjIndex(passBytesFromCurPos(m3gBytes, 0x4));
-
-		if (increaseIds != 0) {
-			subMeshObj.setIndexBufferObjIndexInc(increaseIds);
-			subMeshObj.setAppearanceObjIndexInc(increaseIds);
-		}
+		subMeshObj.setAppearanceObjUUID(getOrderReferenceUUID(
+				subMeshObj.getAppearanceObjIndex()));
+		//
 		
 		getObjSubMeshInfo(subMeshObj, objLogCollection);
 		return subMeshObj;
@@ -657,55 +772,8 @@ public class M3GTools {
 	// 0x9
 	private void getObjGroupInfo(M3GObjGroup groupObj, List<String> objLogCollection) {
 		int logCounter = 0;
-		objLogCollection.add(String.format("::: Animation Controllers: %s%n", 
-				HEXUtils.hexToString(groupObj.getAnimationControllers()) ));
-		objLogCollection.add(String.format("::: Animation Tracks: %d%n", 
-				groupObj.getAnimationTracks() ));
-		for (Integer id : groupObj.getAnimationArray()) {
-			objLogCollection.add(String.format("::: Animation Track #%d Object Ref. ID: %d%n", 
-					logCounter, id ));
-			logCounter++;
-		}
-		logCounter = 0;
+		getObjGroupBaseInfo(groupObj, objLogCollection, logCounter);
 		
-		objLogCollection.add(String.format("::: Parameter Count: %d%n", 
-				groupObj.getParameterCount() ));
-		for (M3GSubObjParameter subParamLog : groupObj.getParameterArray()) {
-			getSubObjParameterInfo(subParamLog, objLogCollection, logCounter);
-			logCounter++;
-		}
-		logCounter = 0;
-		
-		objLogCollection.add(String.format("::: Has Component Transform: %d%n", 
-				groupObj.getHasComponentTransform() ));
-		if (groupObj.getHasComponentTransform() != 0) {
-			objLogCollection.add(String.format("::: Component Transform / Translation [%f, %f, %f]%n", 
-					groupObj.getComponentTransform().getTranslation()[0],
-					groupObj.getComponentTransform().getTranslation()[1],
-					groupObj.getComponentTransform().getTranslation()[2] ));
-			objLogCollection.add(String.format("::: Component Transform / Scale [%f, %f, %f]%n", 
-					groupObj.getComponentTransform().getScale()[0],
-					groupObj.getComponentTransform().getScale()[1],
-					groupObj.getComponentTransform().getScale()[2] ));
-			objLogCollection.add(String.format("::: Component Transform / Orientation Angle: %f%n", 
-					groupObj.getComponentTransform().getOrientationAngle() ));
-			objLogCollection.add(String.format("::: Component Transform / Orientation Axis X: %f%n", 
-					groupObj.getComponentTransform().getOrientationAxisX() ));
-			objLogCollection.add(String.format("::: Component Transform / Orientation Axis Y: %f%n", 
-					groupObj.getComponentTransform().getOrientationAxisY() ));
-			objLogCollection.add(String.format("::: Component Transform / Orientation Axis Z: %f%n", 
-					groupObj.getComponentTransform().getOrientationAxisZ() ));
-		}
-		objLogCollection.add(String.format("::: Has General Transform: %d%n", 
-				groupObj.getHasGeneralTransform() ));
-		if (groupObj.getHasGeneralTransform() != 0) {
-			objLogCollection.add(String.format("::: General Transform Bytes: %s%n", 
-					HEXUtils.hexToString(groupObj.getGeneralTransformBytes()) ));
-		}
-		objLogCollection.add(String.format("::: Unknown Byte Part: %s%n", 
-				HEXUtils.hexToString(groupObj.getUnkPart()) ));
-		objLogCollection.add(String.format("::: Has Unknown Functional Part: %d%n", 
-				groupObj.getHasUnkFuncPart() ));
 		objLogCollection.add(String.format("::: Child Count: %d%n", 
 				groupObj.getChildCount() ));
 		for (Integer id : groupObj.getChildObjIndexArray()) {
@@ -713,6 +781,58 @@ public class M3GTools {
 					logCounter, id ));
 			logCounter++;
 		}
+	}
+	
+	private void getObjGroupBaseInfo(M3GObjGroupBase groupBaseObj, List<String> objLogCollection, int logCounter) {
+		objLogCollection.add(String.format("::: Animation Controllers: %s%n", 
+				HEXUtils.hexToString(groupBaseObj.getAnimationControllers()) ));
+		objLogCollection.add(String.format("::: Animation Tracks: %d%n", 
+				groupBaseObj.getAnimationTracks() ));
+		for (Integer id : groupBaseObj.getAnimationArray()) {
+			objLogCollection.add(String.format("::: Animation Track #%d Object Ref. ID: %d%n", 
+					logCounter, id ));
+			logCounter++;
+		}
+		logCounter = 0;
+		
+		objLogCollection.add(String.format("::: Parameter Count: %d%n", 
+				groupBaseObj.getParameterCount() ));
+		for (M3GSubObjParameter subParamLog : groupBaseObj.getParameterArray()) {
+			getSubObjParameterInfo(subParamLog, objLogCollection, logCounter);
+			logCounter++;
+		}
+		logCounter = 0;
+		
+		objLogCollection.add(String.format("::: Has Component Transform: %d%n", 
+				groupBaseObj.getHasComponentTransform() ));
+		if (groupBaseObj.getHasComponentTransform() != 0) {
+			objLogCollection.add(String.format("::: Component Transform / Translation [%f, %f, %f]%n", 
+					groupBaseObj.getComponentTransform().getTranslation()[0],
+					groupBaseObj.getComponentTransform().getTranslation()[1],
+					groupBaseObj.getComponentTransform().getTranslation()[2] ));
+			objLogCollection.add(String.format("::: Component Transform / Scale [%f, %f, %f]%n", 
+					groupBaseObj.getComponentTransform().getScale()[0],
+					groupBaseObj.getComponentTransform().getScale()[1],
+					groupBaseObj.getComponentTransform().getScale()[2] ));
+			objLogCollection.add(String.format("::: Component Transform / Orientation Angle: %f%n", 
+					groupBaseObj.getComponentTransform().getOrientationAngle() ));
+			objLogCollection.add(String.format("::: Component Transform / Orientation Axis X: %f%n", 
+					groupBaseObj.getComponentTransform().getOrientationAxisX() ));
+			objLogCollection.add(String.format("::: Component Transform / Orientation Axis Y: %f%n", 
+					groupBaseObj.getComponentTransform().getOrientationAxisY() ));
+			objLogCollection.add(String.format("::: Component Transform / Orientation Axis Z: %f%n", 
+					groupBaseObj.getComponentTransform().getOrientationAxisZ() ));
+		}
+		objLogCollection.add(String.format("::: Has General Transform: %d%n", 
+				groupBaseObj.getHasGeneralTransform() ));
+		if (groupBaseObj.getHasGeneralTransform() != 0) {
+			objLogCollection.add(String.format("::: General Transform Bytes: %s%n", 
+					HEXUtils.hexToString(groupBaseObj.getGeneralTransformBytes()) ));
+		}
+		objLogCollection.add(String.format("::: Unknown Byte Part: %s%n", 
+				HEXUtils.hexToString(groupBaseObj.getUnkPart()) ));
+		objLogCollection.add(String.format("::: Has Unknown Functional Part: %d%n", 
+				groupBaseObj.getHasUnkFuncPart() ));
 	}
 	
 	// 0xA
@@ -755,6 +875,39 @@ public class M3GTools {
 		}
 	}
 	
+	// 0x10
+	private void getObjClonedGroupInfo(M3GObjClonedGroup clonedGroupObj, List<String> objLogCollection) {
+		int logCounter = 0;
+		getObjGroupBaseInfo(clonedGroupObj, objLogCollection, logCounter);
+		
+		objLogCollection.add(String.format("::: Common Vertex Buffer Object Ref. ID: %d%n", 
+				clonedGroupObj.getCommonVertexBufferObjIndex() ));
+		
+		objLogCollection.add(String.format("::: Object LODs Count: %d%n", 
+				clonedGroupObj.getObjLODCount() ));
+		for (Integer id : clonedGroupObj.getObjLODIndexArray()) {
+			objLogCollection.add(String.format("::: Object LODs #%d Object Ref. ID: %d%n", 
+					logCounter, id ));
+			logCounter++;
+		}
+		logCounter = 0;
+		
+		objLogCollection.add(String.format("::: Group Object Ref. ID: %d%n", 
+				clonedGroupObj.getGroupObjIndex() ));
+		objLogCollection.add(String.format("::: Vertex Array #1 Object Ref. ID: %d%n", 
+				clonedGroupObj.getVertexArray1ObjIndex() ));
+		objLogCollection.add(String.format("::: Vertex Array #2 Object Ref. ID: %d%n", 
+				clonedGroupObj.getVertexArray2ObjIndex() ));
+		
+		objLogCollection.add(String.format("::: Mount Groups Count: %d%n", 
+				clonedGroupObj.getMountGroupsObjCount() ));
+		for (Integer id : clonedGroupObj.getMountGroupsObjIndexArray()) {
+			objLogCollection.add(String.format("::: Mount Group #%d Object Ref. ID: %d%n", 
+					logCounter, id ));
+			logCounter++;
+		}
+	}
+	
 	// 0x11
 	private void getObjTextureRefInfo(M3GObjTextureRef textureRefObj, List<String> objLogCollection) {
 		objLogCollection.add(String.format("::: Unknown Part: %s%n", 
@@ -765,9 +918,9 @@ public class M3GTools {
 		    HEXUtils.hexToString(textureRefObj.getUnkPart2())));
 	}
 	
-	// 0x2
+	// 0x14
 	private void getObjVertexArrayInfo(M3GObjVertexArray vertexArrayObj, List<String> objLogCollection) {
-		if (!outputVertexAndIndexes) {return;}
+		if (!LaunchParameters.isOutputVertexAndIndexes()) {return;}
 		objLogCollection.add(String.format("::: Component Size: %d%n", 
 				vertexArrayObj.getComponentSize()));
 		objLogCollection.add(String.format("::: Component Count: %d%n", 
@@ -855,7 +1008,7 @@ public class M3GTools {
 	
 	// 0x65
 	private void getObjIndexBufferInfo(M3GObjIndexBuffer indexBufferObj, List<String> objLogCollection) {
-		if (!outputVertexAndIndexes) {return;}
+		if (!LaunchParameters.isOutputVertexAndIndexes()) {return;}
 		objLogCollection.add(String.format("::: Encoding: %d%n", 
 				indexBufferObj.getEncoding()));
 		
